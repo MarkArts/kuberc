@@ -1,0 +1,529 @@
+apiVersion: v1
+data:
+  MOLLIE_TEST: "True"
+  NEW_RELIC_APP_NAME: example-testing
+  NEW_RELIC_LABELS: environment:testing;service:example
+kind: ConfigMap
+metadata:
+  labels:
+    app: example
+    env: testing
+    provider: kustomize
+  name: euc1-testing-example-env-2d5b8f6ggb
+  namespace: default
+---
+apiVersion: v1
+data:
+  flowerconfig.py: |
+    accept_content=['pickle']
+    result_accept_content=['pickle']
+    persistent=True
+    db='/flower/flower'
+kind: ConfigMap
+metadata:
+  labels:
+    app: example
+    env: testing
+    provider: kustomize
+  name: euc1-testing-example-flower-config
+  namespace: default
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: example
+    env: testing
+    provider: kustomize
+  name: euc1-testing-example-flower-service
+  namespace: default
+spec:
+  ports:
+  - name: flower
+    port: 5555
+  selector:
+    app: example
+    component: flower
+    env: testing
+    provider: kustomize
+    thisotherkey: alsodoesnotexist
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: example
+    env: testing
+    provider: kustomize
+  name: euc1-testing-example-service
+  namespace: default
+spec:
+  ports:
+  - name: api
+    port: 5000
+  selector:
+    app: example
+    component: api
+    env: testing
+    provider: kustomize
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app: example
+    env: testing
+    provider: kustomize
+  name: euc1-testing-example-efs-claim
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: efs-sc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: example
+    env: testing
+    provider: kustomize
+  name: euc1-testing-example-celery-worker-deployment
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: example
+      component: celery-worker-application
+      env: testing
+      provider: kustomize
+  template:
+    metadata:
+      labels:
+        app: example
+        component: celery-worker-application
+        env: testing
+        provider: kustomize
+    spec:
+      containers:
+      - command:
+        - newrelic-admin
+        - run-program
+        - celery
+        - --app=psp_service.tasks.celery
+        - worker
+        - --loglevel=INFO
+        - --max-memory-per-child=400000
+        env:
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: val
+              name: example-secret-key
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: val
+              name: example-api-key
+        - name: MERCHANT_KEYS
+          valueFrom:
+            secretKeyRef:
+              key: val
+              name: example-merchant-keys
+        envFrom:
+        - configMapRef:
+            name: euc1-testing-example-env-2d5b8f6ggb
+        image: example.image/doesntexist:version
+        name: task
+        resources:
+          limits:
+            cpu: 200m
+            memory: 400m
+          requests:
+            cpu: 100m
+            memory: 400M
+      imagePullSecrets:
+      - name: dockerconfigjson
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: example
+    env: testing
+    provider: kustomize
+  name: euc1-testing-example-deployment
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: example
+      component: api
+      env: testing
+      provider: kustomize
+  template:
+    metadata:
+      labels:
+        app: example
+        component: api
+        env: testing
+        prometheus-example: uwsgi-pod-monitor
+        provider: kustomize
+    spec:
+      containers:
+      - command:
+        - newrelic-admin
+        - run-program
+        - /usr/local/bin/uwsgi
+        - --module
+        - wsgi:app
+        env:
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: val
+              name: example-secret-key
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: val
+              name: example-api-key
+        - name: MERCHANT_KEYS
+          valueFrom:
+            secretKeyRef:
+              key: val
+              name: example-merchant-keys
+        envFrom:
+        - configMapRef:
+            name: euc1-testing-example-env-2d5b8f6ggb
+        image: example.image/doesntexist:version
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - sleep
+              - "20"
+        livenessProbe:
+          httpGet:
+            path: /_health
+            port: api
+        name: api
+        ports:
+        - containerPort: 5000
+          name: api
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        startupProbe:
+          failureThreshold: 6
+          httpGet:
+            path: /_health
+            port: api
+          periodSeconds: 10
+      - command:
+        - /bin/uwsgi_exporter
+        - --stats.uri
+        - http://localhost:8001
+        - --web.telemetry-path
+        - /_metrics
+        image: timonwong/uwsgi-exporter
+        name: uwsgi-exporter
+        ports:
+        - containerPort: 9117
+          name: uwsgi-metrics
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 10m
+            memory: 32Mi
+      imagePullSecrets:
+      - name: dockerconfigjson
+      terminationGracePeriodSeconds: 50
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: example
+    env: testing
+    provider: kustomize
+  name: euc1-testing-example-flower-deployment
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: example
+      env: testing
+      provider: kustomize
+  template:
+    metadata:
+      labels:
+        app: example
+        component: flower
+        env: testing
+        prometheus-example: flower-pod-monitor
+        provider: kustomize
+    spec:
+      containers:
+      - command:
+        - celery
+        - --config=flowerconfig
+        - flower
+        env:
+        - name: example_RABBITMQ_HOST
+          valueFrom:
+            secretKeyRef:
+              key: host
+              name: rabbitmq-connection
+        - name: example_RABBITMQ_PORT
+          valueFrom:
+            secretKeyRef:
+              key: port
+              name: rabbitmq-connection
+        - name: example_RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: rabbitmq-connection
+        - name: example_RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: rabbitmq-connection
+        - name: BROKER_URL
+          value: amqp://$(example_RABBITMQ_USER):$(example_RABBITMQ_PASSWORD)@$(example_RABBITMQ_HOST):$(example_RABBITMQ_PORT)/$(example_RABBITMQ_VHOST)
+        envFrom:
+        - configMapRef:
+            name: euc1-testing-example-env-2d5b8f6ggb
+        image: mher/flower:1.2
+        livenessProbe:
+          httpGet:
+            path: /healthcheck
+            port: flower
+        name: flower
+        ports:
+        - containerPort: 5555
+          name: flower
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        startupProbe:
+          failureThreshold: 6
+          httpGet:
+            path: /healthcheck
+            port: flower
+          periodSeconds: 10
+        volumeMounts:
+        - mountPath: /data
+          name: config
+          readOnly: true
+        - mountPath: /flower
+          name: flower-storage
+          subPath: example_celery_flower
+      imagePullSecrets:
+      - name: dockerconfigjson
+      volumes:
+      - configMap:
+          items:
+          - key: flowerconfig.py
+            path: flowerconfig.py
+          name: euc1-testing-example-flower-config
+        name: config
+      - name: flower-storage
+        persistentVolumeClaim:
+          claimName: euc1-testing-example-efs-claim
+---
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  labels:
+    app: example
+    env: testing
+    provider: kustomize
+  name: euc1-testing-example-celery-worker-hpa
+  namespace: default
+spec:
+  maxReplicas: 10
+  metrics:
+  - resource:
+      name: cpu
+      target:
+        averageUtilization: 80
+        type: Utilization
+    type: Resource
+  minReplicas: 2
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: doesnotexist
+---
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  labels:
+    app: example
+    env: testing
+    provider: kustomize
+  name: euc1-testing-example-hpa
+  namespace: default
+spec:
+  maxReplicas: 10
+  metrics:
+  - resource:
+      name: cpu
+      target:
+        averageUtilization: 80
+        type: Utilization
+    type: Resource
+  minReplicas: 2
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: euc1-testing-example-deployment
+---
+apiVersion: isindir.github.com/v1alpha3
+kind: SopsSecret
+metadata:
+  labels:
+    env: testing
+    provider: kustomize
+  name: euc1-testing-example-sops
+  namespace: default
+sops:
+  age: []
+  azure_kv: []
+  encrypted_regex: ^(data|stringData)$
+  gcp_kms: []
+  hc_vault: []
+  kms:
+  - arn: arn:aws:kms:eu-central-1:184896767354:key/25a9ba66-3b45-4988-82ee-6cd5cc3b3e9f
+    aws_profile: ""
+    created_at: "2022-10-17T08:31:52Z"
+    enc: exampleonly
+  lastmodified: "2023-06-14T13:03:55Z"
+  mac: exampleonly
+  pgp: []
+  version: 3.7.3
+spec:
+  secretTemplates:
+  - name: example-secret-key
+    stringData:
+      val: exampleonly
+  - name: example-api-key
+    stringData:
+      val: exampleonly
+  - name: example-sentry-dsn
+    stringData:
+      val: exampleonly
+  suspend: false
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app: example
+    env: testing
+    provider: kustomize
+  name: euc1-testing-example-flower-pod-monitor
+  namespace: default
+spec:
+  podMetricsEndpoints:
+  - path: /metrics
+    port: flower
+  podTargetLabels:
+  - app
+  - env
+  selector:
+    matchLabels:
+      prometheus-example: flower-pod-monitor
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app: example
+    env: testing
+    provider: kustomize
+  name: euc1-testing-example-uwsgi-pod-monitor
+  namespace: default
+spec:
+  podMetricsEndpoints:
+  - path: /_metrics
+    port: uwsgi-metrics
+  podTargetLabels:
+  - app
+  - env
+  selector:
+    matchLabels:
+      prometheus-example: thisexampledoesnotexist
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: /healthcheck
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/target-type: ip
+  labels:
+    add-log-annotation: "true"
+    env: testing
+    provider: kustomize
+  name: euc1-testing-flower-example-ingress
+  namespace: default
+spec:
+  ingressClassName: albinternal
+  rules:
+  - host: example.domain
+    http:
+      paths:
+      - backend:
+          service:
+            name: euc1-testing-example-flower-service
+            port:
+              name: flower
+        path: /
+        pathType: Prefix
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: /_health/
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/target-type: ip
+  labels:
+    add-log-annotation: "true"
+    env: testing
+    provider: kustomize
+  name: euc1-testing-example-external-ingress
+  namespace: default
+spec:
+  ingressClassName: albexternal
+  rules:
+  - host: example.domain
+    http:
+      paths:
+      - backend:
+          service:
+            name: euc1-testing-example-service
+            port:
+              name: api
+        path: /
+        pathType: Prefix
