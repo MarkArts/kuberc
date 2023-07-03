@@ -10,9 +10,8 @@ what resources should and shouldn't be bundled.
 
 # Setup
 
-Use the nix shell or setup deno yourself. This will also create a .vscode config
-with autocomplete for deno and link vscode the nix installed deno used in the
-shell
+Use the nix shell or setup deno yourself. the nix shell will also create a .vscode config
+with autocomplete for deno and link vscode to the nix installed deno
 
 ```
 nix-shell
