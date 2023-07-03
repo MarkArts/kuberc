@@ -4,11 +4,11 @@ type baseK8SResource = {
   metadata: { name: string };
 };
 
-class ReferenceCheckError extends Error {
+export class ReferenceCheckError {
   resource: baseK8SResource;
-
+  msg: string;
   constructor(resource: baseK8SResource, msg: string) {
-    super(msg);
+    this.msg = msg;
 
     this.resource = resource;
   }
@@ -17,13 +17,11 @@ class ReferenceCheckError extends Error {
 type ScaleTargetRef = { kind: string; apiVersion: string; name: string };
 class ScaleTargetDoesNotExist extends ReferenceCheckError {
   scaleTargetRef: ScaleTargetRef;
-
   constructor(
     resource: baseK8SResource,
     scaleTargetRef: ScaleTargetRef,
-    msg: string,
   ) {
-    super(resource, msg);
+    super(resource, "ScaleTargetRef does not exist");
 
     this.scaleTargetRef = scaleTargetRef;
   }
@@ -34,13 +32,27 @@ export function checkHPA(
     spec: { scaleTargetRef: ScaleTargetRef };
   } & baseK8SResource,
   resources: baseK8SResource[],
-) {
+): ReferenceCheckError[] {
   if (!doesScaleTargetExist(hpa.spec.scaleTargetRef, resources)) {
-    throw new ScaleTargetDoesNotExist(
-      hpa,
-      hpa.spec.scaleTargetRef,
-      "ScaleTargetRef does not exist",
-    );
+    return [
+      new ScaleTargetDoesNotExist(
+        hpa,
+        hpa.spec.scaleTargetRef,
+      ),
+    ];
+  }
+  return [];
+}
+
+class PodSelectorDoesNotExist extends ReferenceCheckError {
+  podSelector: { [key: string]: string };
+  constructor(
+    resource: baseK8SResource,
+    serviceSelector: { [key: string]: string },
+  ) {
+    super(resource, "selected pods do not exist");
+
+    this.podSelector = serviceSelector;
   }
 }
 
@@ -49,13 +61,17 @@ export function checkService(
     spec: { selector: { [key: string]: string } };
   } & baseK8SResource,
   resources: baseK8SResource[],
-) {
+): ReferenceCheckError[] {
   if (!doesServiceSelectorExist(service.spec.selector, resources)) {
-    console.log(
-      `${service.kind}: ${service.metadata.name} selector does not exist. selector:\n`,
-      service.spec.selector,
-    );
+    return [
+      new PodSelectorDoesNotExist(
+        service,
+        service.spec.selector,
+      ),
+    ];
   }
+
+  return [];
 }
 
 export function checkPodMonitor(
@@ -65,10 +81,27 @@ export function checkPodMonitor(
   resources: baseK8SResource[],
 ) {
   if (!doesPodMonitorSelectorExist(podMonitor.spec.selector, resources)) {
-    console.error(
-      `${podMonitor.kind}: ${podMonitor.metadata.name} selector does not exist. selector:\n`,
-      podMonitor.spec.selector,
-    );
+    return [
+      new PodSelectorDoesNotExist(
+        podMonitor,
+        podMonitor.spec.selector.matchLabels,
+      ),
+    ];
+  }
+
+  return [];
+}
+
+type ingressBackend = { service: { name: string; port: { name: string } } };
+class IngressPathDoesNotExist extends ReferenceCheckError {
+  path: { backend: ingressBackend; path: string };
+  constructor(
+    resource: baseK8SResource,
+    path: { backend: ingressBackend; path: string },
+  ) {
+    super(resource, "selected pods do not exist");
+
+    this.path = path;
   }
 }
 
@@ -85,16 +118,67 @@ export function checkIngress(
     };
   } & baseK8SResource,
   resources: baseK8SResource[],
-) {
+): ReferenceCheckError[] {
+  let errors: ReferenceCheckError[] = [];
   for (const rule of ingress.spec.rules) {
     for (const path of rule!.http!.paths) {
       if (!doesIngressBackendExist(path.backend, resources)) {
-        console.log(
-          `${ingress.kind}: ${ingress.metadata.name}, ${rule.host}, ${path.path} backend does not exist. backend:\n`,
-          path.backend,
-        );
+        errors = [
+          ...errors,
+          new IngressPathDoesNotExist(ingress, path),
+        ];
       }
     }
+  }
+
+  return errors;
+}
+
+class DeploymentSelectorDoesNotMatchTemplate extends ReferenceCheckError {
+  selector: { matchLabels: { [key: string]: string } };
+
+  constructor(
+    resource: baseK8SResource,
+    selector: { matchLabels: { [key: string]: string } },
+  ) {
+    super(
+      resource,
+      "Deployment spec.selector does not match spec.template.metadata.labels",
+    );
+
+    this.selector = selector;
+  }
+}
+
+class VolumeDoesNotExist extends ReferenceCheckError {
+  volume: { name: string };
+
+  constructor(
+    resource: baseK8SResource,
+    volume: { name: string },
+  ) {
+    super(
+      resource,
+      "Volum of deployment does not not exist",
+    );
+
+    this.volume = volume;
+  }
+}
+
+class ConfigmapDoesNotExist extends ReferenceCheckError {
+  name: string;
+
+  constructor(
+    resource: baseK8SResource,
+    name: string,
+  ) {
+    super(
+      resource,
+      "Deployment references configmap that does not exist",
+    );
+
+    this.name = name;
   }
 }
 
@@ -121,7 +205,8 @@ export function checkDeploymentOrStateFullSet(
   resources: baseK8SResource[],
   skipConfigmapRefs: string[],
   skipSecretRefs: string[],
-) {
+): ReferenceCheckError[] {
+  let errors: ReferenceCheckError[] = [];
   // Does not support .spec.selector.matchExpressions
   if (
     !labelsMatch(
@@ -129,12 +214,13 @@ export function checkDeploymentOrStateFullSet(
       resource.spec.template.metadata.labels,
     )
   ) {
-    console.error(
-      `${resource.kind}: ${resource.metadata.name} Deployment spec.selector does not match spec.template.metadata.lables: selector:\n`,
-      resource.spec.selector.matchLabels,
-      "spec.template.metadata.labels:\n",
-      resource.spec.template.metadata.labels,
-    );
+    errors = [
+      ...errors,
+      new DeploymentSelectorDoesNotMatchTemplate(
+        resource,
+        resource.spec.selector,
+      ),
+    ];
   }
 
   if (resource.spec.template.spec.volumes) {
@@ -142,10 +228,10 @@ export function checkDeploymentOrStateFullSet(
     for (const volume of resource.spec.template.spec.volumes) {
       if (volume.configMap) {
         if (!findResource("ConfigMap", volume.configMap.name, resources)) {
-          console.error(
-            `${resource.kind}: ${resource.metadata.name}, references configmap that does not exist for volume ${volume.name}:\n`,
-            volume,
-          );
+          errors = [
+            ...errors,
+            new VolumeDoesNotExist(resource, volume),
+          ];
         }
       }
 
@@ -157,10 +243,10 @@ export function checkDeploymentOrStateFullSet(
             resources,
           )
         ) {
-          console.error(
-            `${resource.kind}: ${resource.metadata.name}, references persistentVolumeClaim that does not exist for volume ${volume.name}:\n`,
-            volume,
-          );
+          errors = [
+            ...errors,
+            new VolumeDoesNotExist(resource, volume),
+          ];
         }
       }
     }
@@ -281,6 +367,8 @@ export function checkDeploymentOrStateFullSet(
       }
     }
   }
+
+  return errors;
 }
 
 function isSecretInSopsTemplate(
@@ -405,8 +493,6 @@ function doesPodMonitorSelectorExist(
   }
   return false;
 }
-
-type ingressBackend = { service: { name: string; port: { name: string } } };
 
 // This only supports finding service backends
 function doesIngressBackendExist(

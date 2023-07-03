@@ -6,6 +6,7 @@ import {
   checkIngress,
   checkPodMonitor,
   checkService,
+  ReferenceCheckError,
 } from "./src/checks.ts";
 
 const parsedArgs = parse(Deno.args);
@@ -29,31 +30,51 @@ const skipConfigmapRefs: string[] = parsedArgs.skip_secrets
 
 const resources: any = parseAll(k8sConfig);
 
+let errors: ReferenceCheckError[] = [];
 for (const resource of resources) {
   if (resource.kind == "HorizontalPodAutoscaler") {
-    checkHPA(resource, resources);
+    errors = [
+      ...errors,
+      ...checkHPA(resource, resources),
+    ];
   }
 
   if (resource.kind == "Service") {
-    checkService(resource, resources);
+    errors = [
+      ...errors,
+      ...checkService(resource, resources),
+    ];
   }
 
   // For now we only support `matchLabels`
   if (resource.kind == "PodMonitor") {
-    checkPodMonitor(resource, resources);
+    errors = [
+      ...errors,
+      ...checkPodMonitor(resource, resources),
+    ];
   }
 
   // For now only support rules[].http.paths[].backend.service
   if (resource.kind == "Ingress") {
-    checkIngress(resource, resources);
+    errors = [
+      ...errors,
+      ...checkIngress(resource, resources),
+    ];
   }
 
   if (resource.kind == "Deployment" || resource.kind == "StatefulSet") {
-    checkDeploymentOrStateFullSet(
-      resource,
-      resources,
-      skipConfigmapRefs,
-      skipSecretRefs,
-    );
+    errors = [
+      ...errors,
+      ...checkDeploymentOrStateFullSet(
+        resource,
+        resources,
+        skipConfigmapRefs,
+        skipSecretRefs,
+      ),
+    ];
   }
 }
+
+console.log(
+  `Parsed ${resources.length} resources and found ${errors.length} issues`,
+);
