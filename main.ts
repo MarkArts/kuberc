@@ -1,6 +1,7 @@
 import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
 import { parseAll } from "https://deno.land/std@0.192.0/yaml/mod.ts";
 import {
+  BaseK8SResource,
   checkDeploymentOrStateFullSet,
   checkHPA,
   checkIngress,
@@ -30,41 +31,41 @@ const skipConfigmapRefs: string[] = parsedArgs.skip_secrets
 
 const resources: any = parseAll(k8sConfig);
 
-let errors: ReferenceCheckIssue[] = [];
+let issues: ReferenceCheckIssue[] = [];
 for (const resource of resources) {
   if (resource.kind == "HorizontalPodAutoscaler") {
-    errors = [
-      ...errors,
+    issues = [
+      ...issues,
       ...checkHPA(resource, resources),
     ];
   }
 
   if (resource.kind == "Service") {
-    errors = [
-      ...errors,
+    issues = [
+      ...issues,
       ...checkService(resource, resources),
     ];
   }
 
   // For now we only support `matchLabels`
   if (resource.kind == "PodMonitor") {
-    errors = [
-      ...errors,
+    issues = [
+      ...issues,
       ...checkPodMonitor(resource, resources),
     ];
   }
 
   // For now only support rules[].http.paths[].backend.service
   if (resource.kind == "Ingress") {
-    errors = [
-      ...errors,
+    issues = [
+      ...issues,
       ...checkIngress(resource, resources),
     ];
   }
 
   if (resource.kind == "Deployment" || resource.kind == "StatefulSet") {
-    errors = [
-      ...errors,
+    issues = [
+      ...issues,
       ...checkDeploymentOrStateFullSet(
         resource,
         resources,
@@ -76,5 +77,35 @@ for (const resource of resources) {
 }
 
 console.log(
-  `Parsed ${resources.length} resources and found ${errors.length} issues`,
+  `Parsed ${resources.length} resources and found ${issues.length} issues`,
 );
+
+const issuesByResource = issues.reduce<
+  {
+    [key: string]: { resource: BaseK8SResource; issues: ReferenceCheckIssue[] };
+  }
+>((acc, x) => {
+  if (!acc[x.resource.metadata.name]) {
+    acc[x.resource.metadata.name] = {
+      resource: x.resource,
+      issues: [x],
+    };
+  } else {
+    acc[x.resource.metadata.name] = {
+      resource: x.resource,
+      issues: [...acc[x.resource.metadata.name].issues, x],
+    };
+  }
+  return acc;
+}, {});
+
+for (const [_, resource] of Object.entries(issuesByResource)) {
+  console.log(`${resource.resource.kind} ${resource.resource.metadata.name}:`);
+  for (const issue of resource.issues) {
+    console.log("\t" + issue.msg);
+  }
+}
+
+if (issues.length >= 1) {
+  Deno.exit(1);
+}

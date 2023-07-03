@@ -1,13 +1,13 @@
-type baseK8SResource = {
+export type BaseK8SResource = {
   kind: string;
   apiVersion: string;
   metadata: { name: string };
 };
 
 export class ReferenceCheckIssue {
-  resource: baseK8SResource;
+  resource: BaseK8SResource;
   msg: string;
-  constructor(resource: baseK8SResource, msg: string) {
+  constructor(resource: BaseK8SResource, msg: string) {
     this.msg = msg;
 
     this.resource = resource;
@@ -18,10 +18,13 @@ type ScaleTargetRef = { kind: string; apiVersion: string; name: string };
 class ScaleTargetDoesNotExist extends ReferenceCheckIssue {
   scaleTargetRef: ScaleTargetRef;
   constructor(
-    resource: baseK8SResource,
+    resource: BaseK8SResource,
     scaleTargetRef: ScaleTargetRef,
   ) {
-    super(resource, "ScaleTargetRef does not exist");
+    super(
+      resource,
+      `ScaleTargetRef ${scaleTargetRef.apiVersion}/${scaleTargetRef.kind}/${scaleTargetRef.name} does not exist`,
+    );
 
     this.scaleTargetRef = scaleTargetRef;
   }
@@ -30,8 +33,8 @@ class ScaleTargetDoesNotExist extends ReferenceCheckIssue {
 export function checkHPA(
   hpa: {
     spec: { scaleTargetRef: ScaleTargetRef };
-  } & baseK8SResource,
-  resources: baseK8SResource[],
+  } & BaseK8SResource,
+  resources: BaseK8SResource[],
 ): ReferenceCheckIssue[] {
   if (!doesScaleTargetExist(hpa.spec.scaleTargetRef, resources)) {
     return [
@@ -47,7 +50,7 @@ export function checkHPA(
 class PodSelectorDoesNotExist extends ReferenceCheckIssue {
   podSelector: { [key: string]: string };
   constructor(
-    resource: baseK8SResource,
+    resource: BaseK8SResource,
     serviceSelector: { [key: string]: string },
   ) {
     super(resource, "selected pods do not exist");
@@ -59,8 +62,8 @@ class PodSelectorDoesNotExist extends ReferenceCheckIssue {
 export function checkService(
   service: {
     spec: { selector: { [key: string]: string } };
-  } & baseK8SResource,
-  resources: baseK8SResource[],
+  } & BaseK8SResource,
+  resources: BaseK8SResource[],
 ): ReferenceCheckIssue[] {
   if (!doesServiceSelectorExist(service.spec.selector, resources)) {
     return [
@@ -77,8 +80,8 @@ export function checkService(
 export function checkPodMonitor(
   podMonitor: {
     spec: { selector: { matchLabels: { [key: string]: string } } };
-  } & baseK8SResource,
-  resources: baseK8SResource[],
+  } & BaseK8SResource,
+  resources: BaseK8SResource[],
 ) {
   if (!doesPodMonitorSelectorExist(podMonitor.spec.selector, resources)) {
     return [
@@ -96,7 +99,7 @@ type ingressBackend = { service: { name: string; port: { name: string } } };
 class IngressPathDoesNotExist extends ReferenceCheckIssue {
   path: { backend: ingressBackend; path: string };
   constructor(
-    resource: baseK8SResource,
+    resource: BaseK8SResource,
     path: { backend: ingressBackend; path: string },
   ) {
     super(resource, "selected pods do not exist");
@@ -116,8 +119,8 @@ export function checkIngress(
         http: { paths: { backend: ingressBackend; path: string }[] };
       }[];
     };
-  } & baseK8SResource,
-  resources: baseK8SResource[],
+  } & BaseK8SResource,
+  resources: BaseK8SResource[],
 ): ReferenceCheckIssue[] {
   let issues: ReferenceCheckIssue[] = [];
   for (const rule of ingress.spec.rules) {
@@ -138,7 +141,7 @@ class DeploymentSelectorDoesNotMatchTemplate extends ReferenceCheckIssue {
   selector: { matchLabels: { [key: string]: string } };
 
   constructor(
-    resource: baseK8SResource,
+    resource: BaseK8SResource,
     selector: { matchLabels: { [key: string]: string } },
   ) {
     super(
@@ -154,7 +157,7 @@ class VolumeDoesNotExist extends ReferenceCheckIssue {
   volume: { name: string };
 
   constructor(
-    resource: baseK8SResource,
+    resource: BaseK8SResource,
     volume: { name: string },
   ) {
     super(
@@ -171,7 +174,7 @@ class ContainerConfigmapRefDoesNotExist extends ReferenceCheckIssue {
   configMapRef: any;
 
   constructor(
-    resource: baseK8SResource,
+    resource: BaseK8SResource,
     container: any,
     configMapRef: any,
   ) {
@@ -190,7 +193,7 @@ class ContainerConfigmapKeyDoesNotExist extends ReferenceCheckIssue {
   configMapKeyRef: any;
 
   constructor(
-    resource: baseK8SResource,
+    resource: BaseK8SResource,
     container: any,
     configMapKeyRef: any,
   ) {
@@ -209,7 +212,7 @@ class ContainerSecretRefDoesNotExist extends ReferenceCheckIssue {
   container: any;
 
   constructor(
-    resource: baseK8SResource,
+    resource: BaseK8SResource,
     container: any,
     secretRef: any,
   ) {
@@ -228,7 +231,7 @@ class ContainerSecretKeyDoesNotExist extends ReferenceCheckIssue {
   secretKeyRef: any;
 
   constructor(
-    resource: baseK8SResource,
+    resource: BaseK8SResource,
     container: any,
     secretKeyRef: any,
   ) {
@@ -258,11 +261,11 @@ type deploymentOrStatefullSet = {
       };
     };
   };
-} & baseK8SResource;
+} & BaseK8SResource;
 
 export function checkDeploymentOrStateFullSet(
   resource: deploymentOrStatefullSet,
-  resources: baseK8SResource[],
+  resources: BaseK8SResource[],
   skipConfigmapRefs: string[],
   skipSecretRefs: string[],
 ): ReferenceCheckIssue[] {
@@ -467,8 +470,8 @@ function isSecretInSopsTemplate(
           data?: { [key: string]: string };
         }[];
       };
-    }[] & baseK8SResource[]
-    | baseK8SResource[],
+    }[] & BaseK8SResource[]
+    | BaseK8SResource[],
 ): boolean {
   for (const resource of resources) {
     if (resource.kind === "SopsSecret") {
@@ -493,8 +496,8 @@ function isSecretInSopsTemplate(
 function findResource(
   kind: string,
   name: string,
-  resources: baseK8SResource[],
-): baseK8SResource | null {
+  resources: BaseK8SResource[],
+): BaseK8SResource | null {
   for (const resource of resources) {
     if (
       resource.kind == kind, resource.metadata.name == name
@@ -507,7 +510,7 @@ function findResource(
 
 function doesScaleTargetExist(
   scaleTargetRef: ScaleTargetRef,
-  resources: baseK8SResource[],
+  resources: BaseK8SResource[],
 ): boolean {
   for (const resource of resources) {
     if (
@@ -535,7 +538,7 @@ function doesServiceSelectorExist(
         };
       };
     };
-  }[] & baseK8SResource[],
+  }[] & BaseK8SResource[],
 ): boolean {
   for (const resource of resources) {
     if (resource.spec?.template?.metadata?.labels) {
@@ -561,7 +564,7 @@ function doesPodMonitorSelectorExist(
         };
       };
     };
-  }[] & baseK8SResource[],
+  }[] & BaseK8SResource[],
 ): boolean {
   for (const resource of resources) {
     if (resource?.spec?.template?.metadata?.labels) {
@@ -582,8 +585,8 @@ function doesPodMonitorSelectorExist(
 function doesIngressBackendExist(
   backend: ingressBackend,
   resources:
-    | { spec: { ports: { name: string }[] } }[] & baseK8SResource[]
-    | baseK8SResource[],
+    | { spec: { ports: { name: string }[] } }[] & BaseK8SResource[]
+    | BaseK8SResource[],
 ): boolean {
   /*
       For mock services, for example we have a alb ingress that uses actions (https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.2/guide/ingress/annotations/#actions).
