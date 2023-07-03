@@ -121,11 +121,20 @@ spec:
         - --loglevel=INFO
         - --max-memory-per-child=400000
         env:
-        - name: SECRET_KEY
+        - name: CONFIGMAPREFTHATDOESNOTEXIST
           valueFrom:
-            secretKeyRef:
-              key: val
-              name: example-secret-key
+            configMapKeyRef:
+              key: bla
+              name: configMapKeyRefDoesNotExist
+        - name: CONFIGMAPKEYHATDOESNOTEXIST
+          valueFrom:
+            configMapKeyRef:
+              key: thiskeydoesnotexist
+              name: euc1-testing-example-flower-config
+        - name: SECRET_KEY
+          secretKeyRef:
+            key: val
+            name: example-secret-key
         - name: API_KEY
           valueFrom:
             secretKeyRef:
@@ -184,6 +193,16 @@ spec:
         - --module
         - wsgi:app
         env:
+        - name: EXAMPLESECRETTHATDOESNOTEXIST
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: doesnotexist
+        - name: EXAMPLESECRETKEYTHATDOESNOTEXIST
+          valueFrom:
+            secretKeyRef:
+              key: doesnotexist
+              name: example-secret
         - name: SECRET_KEY
           valueFrom:
             secretKeyRef:
@@ -434,6 +453,14 @@ spec:
     stringData:
       val: exampleonly
   suspend: false
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: exampleSecret
+type: Opaque
+data:
+  password: examplePassword
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor

@@ -58,7 +58,7 @@ for (const resource of k8sYAML) {
     }
   }
 
-  if (resource.kind == "Deployment") {
+  if (resource.kind == "Deployment" || resource.kind == "StatefulSet") {
     // Does not support .spec.selector.matchExpressions
     if (
       !labelsMatch(
@@ -83,30 +83,101 @@ for (const resource of k8sYAML) {
     for (const container of containers) {
       if (container.envFrom) {
         for (const envFrom of container.envFrom) {
-          if (envFrom.configMapRef) {
-            if (
-              !envFrom.configMapRef.optional &&
-              !doesResourceExist(
-                "ConfigMap",
-                envFrom.configMapRef.name,
-                k8sYAML,
-              )
-            ) {
+          if (
+            envFrom.configMapRef && !envFrom.configMapRef.optional &&
+            !findResource(
+              "ConfigMap",
+              envFrom.configMapRef.name,
+              k8sYAML,
+            )
+          ) {
+            {
               console.error(
                 `${resource.kind}: ${resource.metadata.name}, container ${container.name} (${container.image}) references configmap that does not exist. envFrom[].configMapRef:\n`,
                 envFrom.configMapRef,
               );
             }
           }
+          if (
+            envFrom.secretRef && !envFrom.secretRef.optional &&
+            !findResource("Secret", envFrom.secretRef.name, k8sYAML)
+          ) {
+            console.error(
+              `${resource.kind}: ${resource.metadata.name}, container ${container.name} (${container.image}) references secret that does not exist. envFrom[].secretRef:\n`,
+              envFrom.secretRef,
+            );
+          }
+        }
+      }
 
-          if (envFrom.secretRef) {
+      // We don't support fieldRef for spec.template.spec.containers[].env[].valueFrom
+      if (container.env) {
+        for (const env of container.env) {
+          if (
+            env.valueFrom?.configMapKeyRef &&
+            !env.valueFrom.configMapKeyRef.optional
+          ) {
+            const configMap = findResource(
+              "ConfigMap",
+              env.valueFrom.configMapKeyRef.name,
+              k8sYAML,
+            );
+            if (!configMap) {
+              console.error(
+                `${resource.kind}: ${resource.metadata.name}, container ${container.name}, ${env.name} references configmap that does not exist. env[].valueFrom.configMapKeyRef:\n`,
+                env.valueFrom.configMapKeyRef,
+              );
+              continue;
+            }
+
             if (
-              !envFrom.secretRef.optional &&
-              !doesResourceExist("Secret", envFrom.secretRef.name, k8sYAML)
+              !Object.keys(configMap.data).some((d) =>
+                d == env.valueFrom.configMapKeyRef.key
+              )
             ) {
               console.error(
-                `${resource.kind}: ${resource.metadata.name}, container ${container.name} (${container.image}) references secret that does not exist. envFrom[].secretRef:\n`,
-                envFrom.secretRef,
+                `${resource.kind}: ${resource.metadata.name}, container ${container.name}, ${env.name} references key in configmap that does not exist. env[].valueFrom.configMapKeyRef:\n`,
+                env.valueFrom.configMapKeyRef,
+              );
+            }
+          }
+
+          if (
+            env.valueFrom?.secretKeyRef &&
+            !env.valueFrom.secretKeyRef.optional
+          ) {
+            if (
+              isSecretInSopsTemplate(
+                env.valueFrom.secretKeyRef.name,
+                env.valueFrom.secretKeyRef.key,
+                k8sYAML,
+              )
+            ) {
+              continue;
+            }
+
+            const secret = findResource(
+              "Secret",
+              env.valueFrom.secretKeyRef.name,
+              k8sYAML,
+            );
+
+            if (!secret) {
+              console.error(
+                `${resource.kind}: ${resource.metadata.name}, container ${container.name}, ${env.name} references secret that does not exist. env[].valueFrom.secretKeyRef:\n`,
+                env.valueFrom.secretKeyRef,
+              );
+              continue;
+            }
+
+            if (
+              !Object.keys(secret.data).some((d) =>
+                d == env.valueFrom.secretKeyRef.key
+              )
+            ) {
+              console.error(
+                `${resource.kind}: ${resource.metadata.name}, secret ${container.name}, ${env.name} references key in configmap that does not exist. env[].valueFrom.secretKeyRef:\n`,
+                env.valueFrom.secretKeyRef,
               );
             }
           }
@@ -116,16 +187,40 @@ for (const resource of k8sYAML) {
   }
 }
 
-function doesResourceExist(
+function isSecretInSopsTemplate(
+  name: string,
+  key: string,
+  resources: any,
+): boolean {
+  for (const resource of resources) {
+    if (resource.kind === "SopsSecret") {
+      for (const secret of resource.spec.secretTemplates) {
+        if (
+          secret.name == name &&
+          (
+            (secret.stringData &&
+              Object.keys(secret.stringData).some((k) => k == key)) ||
+            (secret.data && Object.keys(secret.data).some((k) => k == key))
+          )
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function findResource(
   kind: string,
   name: string,
   resources: any,
-): boolean {
+): any | boolean {
   for (const resource of resources) {
     if (
       resource.kind == kind, resource.metadata.name == name
     ) {
-      return true;
+      return resource;
     }
   }
   return false;
