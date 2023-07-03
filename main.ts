@@ -20,11 +20,11 @@ const skipConfigmapRefs: string[] = parsedArgs.skip_secrets
   ? parsedArgs.skip_secrets.split(",")
   : [];
 
-const k8sYAML: any = parseAll(k8sConfig);
+const resources: any = parseAll(k8sConfig);
 
-for (const resource of k8sYAML) {
+for (const resource of resources) {
   if (resource.kind == "HorizontalPodAutoscaler") {
-    if (!doesScaleTargetExist(resource.spec.scaleTargetRef, k8sYAML)) {
+    if (!doesScaleTargetExist(resource.spec.scaleTargetRef, resources)) {
       console.error(
         `${resource.kind}: ${resource.metadata.name} scaltetargeref does not exist: scaleTargetRef:\n`,
         resource.spec.scaleTargetRef,
@@ -33,7 +33,7 @@ for (const resource of k8sYAML) {
   }
 
   if (resource.kind == "Service") {
-    if (!doesServiceSelectorExist(resource.spec.selector, k8sYAML)) {
+    if (!doesServiceSelectorExist(resource.spec.selector, resources)) {
       console.log(
         `${resource.kind}: ${resource.metadata.name} selector does not exist. selector:\n`,
         resource.spec.selector,
@@ -43,7 +43,7 @@ for (const resource of k8sYAML) {
 
   // For now we only support `matchLabels`
   if (resource.kind == "PodMonitor") {
-    if (!doesPodMonitorSelectorExist(resource.spec.selector, k8sYAML)) {
+    if (!doesPodMonitorSelectorExist(resource.spec.selector, resources)) {
       console.error(
         `${resource.kind}: ${resource.metadata.name} selector does not exist. selector:\n`,
         resource.spec.selector,
@@ -55,7 +55,7 @@ for (const resource of k8sYAML) {
   if (resource.kind == "Ingress") {
     for (const rule of resource!.spec!.rules) {
       for (const path of rule!.http!.paths) {
-        if (!doesIngressBackendExist(path.backend, k8sYAML)) {
+        if (!doesIngressBackendExist(path.backend, resources)) {
           console.log(
             `${resource.kind}: ${resource.metadata.name}, ${rule.host}, ${path.path} backend does not exist. backend:\n`,
             path.backend,
@@ -81,6 +81,35 @@ for (const resource of k8sYAML) {
       );
     }
 
+    if (resource.spec.template.spec.volumes) {
+      // Only supports configmap and persistentVolumeClain
+      for (const volume of resource.spec.template.spec.volumes) {
+        if (volume.configMap) {
+          if (!findResource("ConfigMap", volume.configMap.name, resources)) {
+            console.error(
+              `${resource.kind}: ${resource.metadata.name}, references configmap that does not exist for volume ${volume.name}:\n`,
+              volume,
+            );
+          }
+        }
+
+        if (volume.persistentVolumeClaim) {
+          if (
+            !findResource(
+              "persistentVolumeClaim",
+              volume.persistentVolumeClaim.claimName,
+              resources,
+            )
+          ) {
+            console.error(
+              `${resource.kind}: ${resource.metadata.name}, references persistentVolumeClaim that does not exist for volume ${volume.name}:\n`,
+              volume,
+            );
+          }
+        }
+      }
+    }
+
     const containers = [
       ...resource.spec.template.spec.containers,
       ...resource.spec.template.spec.initContainers
@@ -97,7 +126,7 @@ for (const resource of k8sYAML) {
             !findResource(
               "ConfigMap",
               envFrom.configMapRef.name,
-              k8sYAML,
+              resources,
             )
           ) {
             {
@@ -111,7 +140,7 @@ for (const resource of k8sYAML) {
             envFrom.secretRef &&
             !skipSecretRefs.includes(envFrom.secretRef.name) &&
             !envFrom.secretRef.optional &&
-            !findResource("Secret", envFrom.secretRef.name, k8sYAML)
+            !findResource("Secret", envFrom.secretRef.name, resources)
           ) {
             console.error(
               `${resource.kind}: ${resource.metadata.name}, container ${container.name} (${container.image}) references secret that does not exist. envFrom[].secretRef:\n`,
@@ -132,25 +161,24 @@ for (const resource of k8sYAML) {
             const configMap = findResource(
               "ConfigMap",
               env.valueFrom.configMapKeyRef.name,
-              k8sYAML,
+              resources,
             );
             if (!configMap) {
               console.error(
                 `${resource.kind}: ${resource.metadata.name}, container ${container.name}, ${env.name} references configmap that does not exist. env[].valueFrom.configMapKeyRef:\n`,
                 env.valueFrom.configMapKeyRef,
               );
-              continue;
-            }
-
-            if (
-              !Object.keys(configMap.data).some((d) =>
-                d == env.valueFrom.configMapKeyRef.key
-              )
-            ) {
-              console.error(
-                `${resource.kind}: ${resource.metadata.name}, container ${container.name}, ${env.name} references key in configmap that does not exist. env[].valueFrom.configMapKeyRef:\n`,
-                env.valueFrom.configMapKeyRef,
-              );
+            } else {
+              if (
+                !Object.keys(configMap.data).some((d) =>
+                  d == env.valueFrom.configMapKeyRef.key
+                )
+              ) {
+                console.error(
+                  `${resource.kind}: ${resource.metadata.name}, container ${container.name}, ${env.name} references key in configmap that does not exist. env[].valueFrom.configMapKeyRef:\n`,
+                  env.valueFrom.configMapKeyRef,
+                );
+              }
             }
           }
 
@@ -160,38 +188,35 @@ for (const resource of k8sYAML) {
             !skipSecretRefs.includes(env.valueFrom.secretKeyRef.name)
           ) {
             if (
-              isSecretInSopsTemplate(
+              !isSecretInSopsTemplate(
                 env.valueFrom.secretKeyRef.name,
                 env.valueFrom.secretKeyRef.key,
-                k8sYAML,
+                resources,
               )
             ) {
-              continue;
-            }
-
-            const secret = findResource(
-              "Secret",
-              env.valueFrom.secretKeyRef.name,
-              k8sYAML,
-            );
-
-            if (!secret) {
-              console.error(
-                `${resource.kind}: ${resource.metadata.name}, container ${container.name}, ${env.name} references secret that does not exist. env[].valueFrom.secretKeyRef:\n`,
-                env.valueFrom.secretKeyRef,
+              const secret = findResource(
+                "Secret",
+                env.valueFrom.secretKeyRef.name,
+                resources,
               );
-              continue;
-            }
 
-            if (
-              !Object.keys(secret.data).some((d) =>
-                d == env.valueFrom.secretKeyRef.key
-              )
-            ) {
-              console.error(
-                `${resource.kind}: ${resource.metadata.name}, secret ${container.name}, ${env.name} references key in configmap that does not exist. env[].valueFrom.secretKeyRef:\n`,
-                env.valueFrom.secretKeyRef,
-              );
+              if (!secret) {
+                console.error(
+                  `${resource.kind}: ${resource.metadata.name}, container ${container.name}, ${env.name} references secret that does not exist. env[].valueFrom.secretKeyRef:\n`,
+                  env.valueFrom.secretKeyRef,
+                );
+              } else {
+                if (
+                  !Object.keys(secret.data).some((d) =>
+                    d == env.valueFrom.secretKeyRef.key
+                  )
+                ) {
+                  console.error(
+                    `${resource.kind}: ${resource.metadata.name}, secret ${container.name}, ${env.name} references key in configmap that does not exist. env[].valueFrom.secretKeyRef:\n`,
+                    env.valueFrom.secretKeyRef,
+                  );
+                }
+              }
             }
           }
         }
