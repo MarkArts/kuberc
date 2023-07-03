@@ -77,7 +77,8 @@ for (const resource of resources) {
 }
 
 console.log(
-  `Parsed ${resources.length} resources and found ${issues.length} issues`,
+  `%cParsed ${resources.length} resources and found ${issues.length} issues`,
+  "color: yellow",
 );
 
 const issuesByResource = issues.reduce<
@@ -100,7 +101,10 @@ const issuesByResource = issues.reduce<
 }, {});
 
 for (const [_, resource] of Object.entries(issuesByResource)) {
-  console.log(`${resource.resource.kind} ${resource.resource.metadata.name}:`);
+  console.log(
+    `%c${resource.resource.kind}: ${resource.resource.metadata.name}:`,
+    "color: red; font-weight: bold",
+  );
   for (const issue of resource.issues) {
     console.log("\t" + issue.msg);
   }
