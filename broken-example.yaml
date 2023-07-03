@@ -452,6 +452,9 @@ spec:
   - name: example-sentry-dsn
     stringData:
       val: exampleonly
+  - name: example-merchant-keys
+    data:
+      val: exampledata
   suspend: false
 ---
 apiVersion: v1
