@@ -6,7 +6,7 @@ import {
   checkIngress,
   checkPodMonitor,
   checkService,
-  ReferenceCheckError,
+  ReferenceCheckIssue,
 } from "./src/checks.ts";
 
 const parsedArgs = parse(Deno.args);
@@ -30,7 +30,7 @@ const skipConfigmapRefs: string[] = parsedArgs.skip_secrets
 
 const resources: any = parseAll(k8sConfig);
 
-let errors: ReferenceCheckError[] = [];
+let errors: ReferenceCheckIssue[] = [];
 for (const resource of resources) {
   if (resource.kind == "HorizontalPodAutoscaler") {
     errors = [

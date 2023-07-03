@@ -4,7 +4,7 @@ type baseK8SResource = {
   metadata: { name: string };
 };
 
-export class ReferenceCheckError {
+export class ReferenceCheckIssue {
   resource: baseK8SResource;
   msg: string;
   constructor(resource: baseK8SResource, msg: string) {
@@ -15,7 +15,7 @@ export class ReferenceCheckError {
 }
 
 type ScaleTargetRef = { kind: string; apiVersion: string; name: string };
-class ScaleTargetDoesNotExist extends ReferenceCheckError {
+class ScaleTargetDoesNotExist extends ReferenceCheckIssue {
   scaleTargetRef: ScaleTargetRef;
   constructor(
     resource: baseK8SResource,
@@ -32,7 +32,7 @@ export function checkHPA(
     spec: { scaleTargetRef: ScaleTargetRef };
   } & baseK8SResource,
   resources: baseK8SResource[],
-): ReferenceCheckError[] {
+): ReferenceCheckIssue[] {
   if (!doesScaleTargetExist(hpa.spec.scaleTargetRef, resources)) {
     return [
       new ScaleTargetDoesNotExist(
@@ -44,7 +44,7 @@ export function checkHPA(
   return [];
 }
 
-class PodSelectorDoesNotExist extends ReferenceCheckError {
+class PodSelectorDoesNotExist extends ReferenceCheckIssue {
   podSelector: { [key: string]: string };
   constructor(
     resource: baseK8SResource,
@@ -61,7 +61,7 @@ export function checkService(
     spec: { selector: { [key: string]: string } };
   } & baseK8SResource,
   resources: baseK8SResource[],
-): ReferenceCheckError[] {
+): ReferenceCheckIssue[] {
   if (!doesServiceSelectorExist(service.spec.selector, resources)) {
     return [
       new PodSelectorDoesNotExist(
@@ -93,7 +93,7 @@ export function checkPodMonitor(
 }
 
 type ingressBackend = { service: { name: string; port: { name: string } } };
-class IngressPathDoesNotExist extends ReferenceCheckError {
+class IngressPathDoesNotExist extends ReferenceCheckIssue {
   path: { backend: ingressBackend; path: string };
   constructor(
     resource: baseK8SResource,
@@ -118,23 +118,23 @@ export function checkIngress(
     };
   } & baseK8SResource,
   resources: baseK8SResource[],
-): ReferenceCheckError[] {
-  let errors: ReferenceCheckError[] = [];
+): ReferenceCheckIssue[] {
+  let Issues: ReferenceCheckIssue[] = [];
   for (const rule of ingress.spec.rules) {
     for (const path of rule!.http!.paths) {
       if (!doesIngressBackendExist(path.backend, resources)) {
-        errors = [
-          ...errors,
+        Issues = [
+          ...Issues,
           new IngressPathDoesNotExist(ingress, path),
         ];
       }
     }
   }
 
-  return errors;
+  return Issues;
 }
 
-class DeploymentSelectorDoesNotMatchTemplate extends ReferenceCheckError {
+class DeploymentSelectorDoesNotMatchTemplate extends ReferenceCheckIssue {
   selector: { matchLabels: { [key: string]: string } };
 
   constructor(
@@ -150,7 +150,7 @@ class DeploymentSelectorDoesNotMatchTemplate extends ReferenceCheckError {
   }
 }
 
-class VolumeDoesNotExist extends ReferenceCheckError {
+class VolumeDoesNotExist extends ReferenceCheckIssue {
   volume: { name: string };
 
   constructor(
@@ -166,7 +166,7 @@ class VolumeDoesNotExist extends ReferenceCheckError {
   }
 }
 
-class ConfigmapDoesNotExist extends ReferenceCheckError {
+class ConfigmapDoesNotExist extends ReferenceCheckIssue {
   name: string;
 
   constructor(
@@ -205,8 +205,8 @@ export function checkDeploymentOrStateFullSet(
   resources: baseK8SResource[],
   skipConfigmapRefs: string[],
   skipSecretRefs: string[],
-): ReferenceCheckError[] {
-  let errors: ReferenceCheckError[] = [];
+): ReferenceCheckIssue[] {
+  let Issues: ReferenceCheckIssue[] = [];
   // Does not support .spec.selector.matchExpressions
   if (
     !labelsMatch(
@@ -214,8 +214,8 @@ export function checkDeploymentOrStateFullSet(
       resource.spec.template.metadata.labels,
     )
   ) {
-    errors = [
-      ...errors,
+    Issues = [
+      ...Issues,
       new DeploymentSelectorDoesNotMatchTemplate(
         resource,
         resource.spec.selector,
@@ -228,8 +228,8 @@ export function checkDeploymentOrStateFullSet(
     for (const volume of resource.spec.template.spec.volumes) {
       if (volume.configMap) {
         if (!findResource("ConfigMap", volume.configMap.name, resources)) {
-          errors = [
-            ...errors,
+          Issues = [
+            ...Issues,
             new VolumeDoesNotExist(resource, volume),
           ];
         }
@@ -243,8 +243,8 @@ export function checkDeploymentOrStateFullSet(
             resources,
           )
         ) {
-          errors = [
-            ...errors,
+          Issues = [
+            ...Issues,
             new VolumeDoesNotExist(resource, volume),
           ];
         }
@@ -368,7 +368,7 @@ export function checkDeploymentOrStateFullSet(
     }
   }
 
-  return errors;
+  return Issues;
 }
 
 function isSecretInSopsTemplate(
