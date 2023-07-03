@@ -29,6 +29,8 @@ const skipConfigmapRefs: string[] = parsedArgs.skip_secrets
   ? parsedArgs.skip_secrets.split(",")
   : [];
 
+const verbose: boolean = parsedArgs.verbose ? parsedArgs.verbose : false;
+
 const resources: any = parseAll(k8sConfig);
 
 let issues: ReferenceCheckIssue[] = [];
@@ -106,7 +108,11 @@ for (const [_, resource] of Object.entries(issuesByResource)) {
     "color: red; font-weight: bold",
   );
   for (const issue of resource.issues) {
-    console.log("\t" + issue.msg);
+    if (!verbose) {
+      console.log("\t" + issue.msg);
+    } else {
+      console.log(issue);
+    }
   }
 }
 
