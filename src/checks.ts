@@ -1,26 +1,54 @@
+type baseK8SResource = {
+  kind: string;
+  apiVersion: string;
+  metadata: { name: string };
+};
+
+class ReferenceCheckError extends Error {
+  resource: baseK8SResource;
+
+  constructor(resource: baseK8SResource, msg: string) {
+    super(msg);
+
+    this.resource = resource;
+  }
+}
+
+type ScaleTargetRef = { kind: string; apiVersion: string; name: string };
+class ScaleTargetDoesNotExist extends ReferenceCheckError {
+  scaleTargetRef: ScaleTargetRef;
+
+  constructor(
+    resource: baseK8SResource,
+    scaleTargetRef: ScaleTargetRef,
+    msg: string,
+  ) {
+    super(resource, msg);
+
+    this.scaleTargetRef = scaleTargetRef;
+  }
+}
+
 export function checkHPA(
   hpa: {
-    spec: { scaleTargetRef: any };
-    kind: string;
-    metadata: { name: string };
-  },
-  resources: any,
+    spec: { scaleTargetRef: ScaleTargetRef };
+  } & baseK8SResource,
+  resources: baseK8SResource[],
 ) {
   if (!doesScaleTargetExist(hpa.spec.scaleTargetRef, resources)) {
-    console.error(
-      `${hpa.kind}: ${hpa.metadata.name} scaltetargeref does not exist: scaleTargetRef:\n`,
+    throw new ScaleTargetDoesNotExist(
+      hpa,
       hpa.spec.scaleTargetRef,
+      "ScaleTargetRef does not exist",
     );
   }
 }
 
 export function checkService(
   service: {
-    spec: { selector: any };
-    kind: string;
-    metadata: { name: string };
-  },
-  resources: any,
+    spec: { selector: { [key: string]: string } };
+  } & baseK8SResource,
+  resources: baseK8SResource[],
 ) {
   if (!doesServiceSelectorExist(service.spec.selector, resources)) {
     console.log(
@@ -32,11 +60,9 @@ export function checkService(
 
 export function checkPodMonitor(
   podMonitor: {
-    spec: { selector: any };
-    kind: string;
-    metadata: { name: string };
-  },
-  resources: any,
+    spec: { selector: { matchLabels: { [key: string]: string } } };
+  } & baseK8SResource,
+  resources: baseK8SResource[],
 ) {
   if (!doesPodMonitorSelectorExist(podMonitor.spec.selector, resources)) {
     console.error(
@@ -57,10 +83,8 @@ export function checkIngress(
         http: { paths: { backend: ingressBackend; path: string }[] };
       }[];
     };
-    kind: string;
-    metadata: { name: string };
-  },
-  resources: any,
+  } & baseK8SResource,
+  resources: baseK8SResource[],
 ) {
   for (const rule of ingress.spec.rules) {
     for (const path of rule!.http!.paths) {
@@ -74,9 +98,27 @@ export function checkIngress(
   }
 }
 
+type deploymentOrStatefullSet = {
+  spec: {
+    selector: { matchLabels: { [key: string]: string } };
+    template: {
+      metadata: { labels: { [key: string]: string } };
+      spec: {
+        volumes?: {
+          name: string;
+          configMap?: { name: string };
+          persistentVolumeClaim?: { claimName: string };
+        }[];
+        containers?: any;
+        initContainers?: any;
+      };
+    };
+  };
+} & baseK8SResource;
+
 export function checkDeploymentOrStateFullSet(
-  resource: any,
-  resources: any,
+  resource: deploymentOrStatefullSet,
+  resources: baseK8SResource[],
   skipConfigmapRefs: string[],
   skipSecretRefs: string[],
 ) {
@@ -172,11 +214,13 @@ export function checkDeploymentOrStateFullSet(
           !skipConfigmapRefs.includes(env.valueFrom.configMapKeyRef.name) &&
           !env.valueFrom.configMapKeyRef.optional
         ) {
-          const configMap = findResource(
-            "ConfigMap",
-            env.valueFrom.configMapKeyRef.name,
-            resources,
-          );
+          // @ts-ignore we know that we will get a configmap
+          const configMap: { data: { [key: string]: string } } | undefined =
+            findResource(
+              "ConfigMap",
+              env.valueFrom.configMapKeyRef.name,
+              resources,
+            );
           if (!configMap) {
             console.error(
               `${resource.kind}: ${resource.metadata.name}, container ${container.name}, ${env.name} references configmap that does not exist. env[].valueFrom.configMapKeyRef:\n`,
@@ -208,7 +252,8 @@ export function checkDeploymentOrStateFullSet(
               resources,
             )
           ) {
-            const secret = findResource(
+            // @ts-ignore we know we get a secret back
+            const secret: { data: string } | undefined = findResource(
               "Secret",
               env.valueFrom.secretKeyRef.name,
               resources,
@@ -241,10 +286,21 @@ export function checkDeploymentOrStateFullSet(
 function isSecretInSopsTemplate(
   name: string,
   key: string,
-  resources: any,
+  resources:
+    | {
+      spec: {
+        secretTemplates: {
+          name: string;
+          stringData?: { [key: string]: string };
+          data?: { [key: string]: string };
+        }[];
+      };
+    }[] & baseK8SResource[]
+    | baseK8SResource[],
 ): boolean {
   for (const resource of resources) {
     if (resource.kind === "SopsSecret") {
+      // @ts-ignore we know the value exists if kind is SopsSecret
       for (const secret of resource.spec.secretTemplates) {
         if (
           secret.name == name &&
@@ -265,8 +321,8 @@ function isSecretInSopsTemplate(
 function findResource(
   kind: string,
   name: string,
-  resources: any,
-): any | boolean {
+  resources: baseK8SResource[],
+): baseK8SResource | null {
   for (const resource of resources) {
     if (
       resource.kind == kind, resource.metadata.name == name
@@ -274,12 +330,12 @@ function findResource(
       return resource;
     }
   }
-  return false;
+  return null;
 }
 
 function doesScaleTargetExist(
-  scaleTargetRef: { kind: string; apiVersion: string; name: string },
-  resources: any,
+  scaleTargetRef: ScaleTargetRef,
+  resources: baseK8SResource[],
 ): boolean {
   for (const resource of resources) {
     if (
@@ -293,12 +349,24 @@ function doesScaleTargetExist(
   return false;
 }
 
+/*
+ This will only check if a Deployment or Statefullset will create a replicaSet that will contain
+ pods that the service selector can target. This does not check for raw pods or replicaSets
+*/
 function doesServiceSelectorExist(
   selector: { [key: string]: string },
-  resources: any,
+  resources: {
+    spec?: {
+      template: {
+        metadata: {
+          labels: { [key: string]: string };
+        };
+      };
+    };
+  }[] & baseK8SResource[],
 ): boolean {
   for (const resource of resources) {
-    if (resource?.spec?.template?.metadata?.labels) {
+    if (resource.spec?.template?.metadata?.labels) {
       if (labelsMatch(selector, resource?.spec?.template?.metadata?.labels)) {
         return true;
       }
@@ -307,9 +375,21 @@ function doesServiceSelectorExist(
   return false;
 }
 
+/*
+ This will only check if a Deployment or Statefullset will create a replicaSet that will contain
+ pods that the podmonitor can target. This does not check for raw pods or replicaSets
+*/
 function doesPodMonitorSelectorExist(
   selector: { matchLabels: { [key: string]: string } },
-  resources: any,
+  resources: {
+    spec?: {
+      template: {
+        metadata: {
+          labels: { [key: string]: string };
+        };
+      };
+    };
+  }[] & baseK8SResource[],
 ): boolean {
   for (const resource of resources) {
     if (resource?.spec?.template?.metadata?.labels) {
@@ -331,7 +411,9 @@ type ingressBackend = { service: { name: string; port: { name: string } } };
 // This only supports finding service backends
 function doesIngressBackendExist(
   backend: ingressBackend,
-  resources: any,
+  resources:
+    | { spec: { ports: { name: string }[] } }[] & baseK8SResource[]
+    | baseK8SResource[],
 ): boolean {
   /*
       For mock services, for example we have a alb ingress that uses actions (https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.2/guide/ingress/annotations/#actions).
@@ -344,9 +426,8 @@ function doesIngressBackendExist(
     if (
       resource.kind == "Service" &&
       resource.metadata.name == backend.service.name &&
-      resource.spec.ports.some((p: { name: string }) =>
-        p.name == backend.service.port.name
-      )
+      // @ts-ignore we know that if `resource.kind=Service` spec.ports will exist
+      resource.spec.ports.some((p) => p.name == backend.service.port.name)
     ) {
       return true;
     }
