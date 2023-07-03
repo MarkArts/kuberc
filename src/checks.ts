@@ -23,7 +23,7 @@ class ScaleTargetDoesNotExist extends ReferenceCheckIssue {
   ) {
     super(
       resource,
-      `ScaleTargetRef ${scaleTargetRef.apiVersion}/${scaleTargetRef.kind}/${scaleTargetRef.name} does not exist`,
+      `.spec.scaleTargetRef does not reference a existing deployment or statefullset`,
     );
 
     this.scaleTargetRef = scaleTargetRef;
@@ -53,7 +53,7 @@ class PodSelectorDoesNotExist extends ReferenceCheckIssue {
     resource: BaseK8SResource,
     serviceSelector: { [key: string]: string },
   ) {
-    super(resource, "selected pods do not exist");
+    super(resource, ".spec.selector does not select any pods");
 
     this.podSelector = serviceSelector;
   }
@@ -102,7 +102,10 @@ class IngressPathDoesNotExist extends ReferenceCheckIssue {
     resource: BaseK8SResource,
     path: { backend: ingressBackend; path: string },
   ) {
-    super(resource, "selected pods do not exist");
+    super(
+      resource,
+      `path ${path.path} of ingress.spec.rules[].http.paths[].backend does not reference a existing service`,
+    );
 
     this.path = path;
   }
@@ -146,7 +149,7 @@ class DeploymentSelectorDoesNotMatchTemplate extends ReferenceCheckIssue {
   ) {
     super(
       resource,
-      "spec.selector does not match spec.template.metadata.labels",
+      ".spec.selector does not match spec.template.metadata.labels",
     );
 
     this.selector = selector;
@@ -162,7 +165,7 @@ class VolumeDoesNotExist extends ReferenceCheckIssue {
   ) {
     super(
       resource,
-      "spec.template.volumes references volume that does not exist",
+      `.spec.template.volumes[] (${volume.name}) references a volume that does not exist`,
     );
 
     this.volume = volume;
@@ -172,76 +175,88 @@ class VolumeDoesNotExist extends ReferenceCheckIssue {
 class ContainerConfigmapRefDoesNotExist extends ReferenceCheckIssue {
   container: any;
   configMapRef: any;
+  configKey: string;
 
   constructor(
     resource: BaseK8SResource,
     container: any,
     configMapRef: any,
+    configKey: string,
   ) {
     super(
       resource,
-      "container references configmap that does not exist",
+      `${configKey} references configmap (${configMapRef.name}) which doesn't exist`,
     );
 
     this.container = container;
     this.configMapRef = configMapRef;
+    this.configKey = configKey;
   }
 }
 
 class ContainerConfigmapKeyDoesNotExist extends ReferenceCheckIssue {
   container: any;
   configMapKeyRef: any;
+  configKey: string;
 
   constructor(
     resource: BaseK8SResource,
     container: any,
     configMapKeyRef: any,
+    configKey: string,
   ) {
     super(
       resource,
-      "container references a key that does not exist in the configmap",
+      `${configKey} references the key (${configMapKeyRef.key}) of configmap (${configMapKeyRef.name}) which doesn't exist`,
     );
 
     this.container = container;
     this.configMapKeyRef = configMapKeyRef;
+    this.configKey = configKey;
   }
 }
 
 class ContainerSecretRefDoesNotExist extends ReferenceCheckIssue {
   secretRef: any;
   container: any;
+  configKey: string;
 
   constructor(
     resource: BaseK8SResource,
     container: any,
     secretRef: any,
+    configKey: string,
   ) {
     super(
       resource,
-      "container references secret that does not exist",
+      `${configKey} references secret (${secretRef.name}) that does not exist`,
     );
 
     this.container = container;
     this.secretRef = secretRef;
+    this.configKey = configKey;
   }
 }
 
 class ContainerSecretKeyDoesNotExist extends ReferenceCheckIssue {
   container: any;
   secretKeyRef: any;
+  configKey: string;
 
   constructor(
     resource: BaseK8SResource,
     container: any,
     secretKeyRef: any,
+    configKey: string,
   ) {
     super(
       resource,
-      "container references key that does not exist in the secret",
+      `${configKey} references the key (${secretKeyRef.key}) of secret (${secretKeyRef.name}) which doesn't exist`,
     );
 
     this.container = container;
     this.secretKeyRef = secretKeyRef;
+    this.configKey = configKey;
   }
 }
 
@@ -341,6 +356,7 @@ export function checkDeploymentOrStateFullSet(
                 resource,
                 container,
                 envFrom.configMapRef,
+                ".spec.template.spec.containers[].envFrom.configMapRef",
               ),
             ];
           }
@@ -357,6 +373,7 @@ export function checkDeploymentOrStateFullSet(
               resource,
               container,
               envFrom.secretRef,
+              ".spec.template.spec.containers[].envFrom.secretRef",
             ),
           ];
         }
@@ -385,6 +402,7 @@ export function checkDeploymentOrStateFullSet(
                 resource,
                 container,
                 env.valueFrom.configMapKeyRef,
+                ".spec.template.spec.containers[].env[].configMapKeyRef",
               ),
             ];
           } else {
@@ -399,6 +417,7 @@ export function checkDeploymentOrStateFullSet(
                   resource,
                   container,
                   env.valueFrom.configMapKeyRef,
+                  ".spec.template.spec.containers[].env[].configMapKeyRef",
                 ),
               ];
             }
@@ -431,6 +450,7 @@ export function checkDeploymentOrStateFullSet(
                   resource,
                   container,
                   env.valueFrom.secretKeyRef,
+                  ".spec.template.spec.containers[].env[].secretKeyRef",
                 ),
               ];
             } else {
@@ -445,6 +465,7 @@ export function checkDeploymentOrStateFullSet(
                     resource,
                     container,
                     env.valueFrom.secretKeyRef,
+                    ".spec.template.spec.containers[].env[].secretKeyRef",
                   ),
                 ];
               }

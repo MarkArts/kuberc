@@ -102,7 +102,7 @@ const issuesByResource = issues.reduce<
 
 for (const [_, resource] of Object.entries(issuesByResource)) {
   console.log(
-    `%c${resource.resource.kind}: ${resource.resource.metadata.name}:`,
+    `%c${resource.resource.metadata.name} (${resource.resource.kind}):`,
     "color: red; font-weight: bold",
   );
   for (const issue of resource.issues) {
