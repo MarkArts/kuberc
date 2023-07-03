@@ -18,8 +18,8 @@ const k8sYAML: any = parseAll(k8sConfig);
 for (const resource of k8sYAML) {
   if (resource.kind == "HorizontalPodAutoscaler") {
     if (!doesScaleTargetExist(resource.spec.scaleTargetRef, k8sYAML)) {
-      console.log(
-        `${resource.kind}: ${resource.metadata.name} scaltetargeref does not exist`,
+      console.error(
+        `${resource.kind}: ${resource.metadata.name} scaltetargeref does not exist: scaleTargetRef:\n`,
         resource.spec.scaleTargetRef,
       );
     }
@@ -37,7 +37,7 @@ for (const resource of k8sYAML) {
   // For now we only support `matchLabels`
   if (resource.kind == "PodMonitor") {
     if (!doesPodMonitorSelectorExist(resource.spec.selector, k8sYAML)) {
-      console.log(
+      console.error(
         `${resource.kind}: ${resource.metadata.name} selector does not exist. selector:\n`,
         resource.spec.selector,
       );
@@ -57,6 +57,78 @@ for (const resource of k8sYAML) {
       }
     }
   }
+
+  if (resource.kind == "Deployment") {
+    // Does not support .spec.selector.matchExpressions
+    if (
+      !labelsMatch(
+        resource.spec.selector.matchLabels,
+        resource.spec.template.metadata.labels,
+      )
+    ) {
+      console.error(
+        `${resource.kind}: ${resource.metadata.name} Deployment spec.selector does not match spec.template.metadata.lables: selector:\n`,
+        resource.spec.selector.matchLabels,
+        "spec.template.metadata.labels:\n",
+        resource.spec.template.metadata.labels,
+      );
+    }
+
+    const containers = [
+      ...resource.spec.template.spec.containers,
+      ...resource.spec.template.spec.initContainers
+        ? resource.spec.template.spec.initContainers
+        : [],
+    ];
+    for (const container of containers) {
+      if (container.envFrom) {
+        for (const envFrom of container.envFrom) {
+          if (envFrom.configMapRef) {
+            if (
+              !envFrom.configMapRef.optional &&
+              !doesResourceExist(
+                "ConfigMap",
+                envFrom.configMapRef.name,
+                k8sYAML,
+              )
+            ) {
+              console.error(
+                `${resource.kind}: ${resource.metadata.name}, container ${container.name} (${container.image}) references configmap that does not exist. envFrom[].configMapRef:\n`,
+                envFrom.configMapRef,
+              );
+            }
+          }
+
+          if (envFrom.secretRef) {
+            if (
+              !envFrom.secretRef.optional &&
+              !doesResourceExist("Secret", envFrom.secretRef.name, k8sYAML)
+            ) {
+              console.error(
+                `${resource.kind}: ${resource.metadata.name}, container ${container.name} (${container.image}) references secret that does not exist. envFrom[].secretRef:\n`,
+                envFrom.secretRef,
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+function doesResourceExist(
+  kind: string,
+  name: string,
+  resources: any,
+): boolean {
+  for (const resource of resources) {
+    if (
+      resource.kind == kind, resource.metadata.name == name
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function doesScaleTargetExist(

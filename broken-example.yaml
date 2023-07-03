@@ -98,6 +98,7 @@ metadata:
 spec:
   selector:
     matchLabels:
+      labelThat: isnotinspec
       app: example
       component: celery-worker-application
       env: testing
@@ -137,7 +138,7 @@ spec:
               name: example-merchant-keys
         envFrom:
         - configMapRef:
-            name: euc1-testing-example-env-2d5b8f6ggb
+            name: thisEnvDoesNotExist
         image: example.image/doesntexist:version
         name: task
         resources:
@@ -201,6 +202,8 @@ spec:
         envFrom:
         - configMapRef:
             name: euc1-testing-example-env-2d5b8f6ggb
+        - secretRef:
+            name: thisSecretDoesNotExist
         image: example.image/doesntexist:version
         lifecycle:
           preStop:
