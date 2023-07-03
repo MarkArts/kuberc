@@ -26,7 +26,7 @@ for (const resource of k8sYAML) {
   }
 
   if (resource.kind == "Service") {
-    if (!doesScaleServiceSelectorExist(resource.spec.selector, k8sYAML)) {
+    if (!doesServiceSelectorExist(resource.spec.selector, k8sYAML)) {
       console.log(
         `${resource.kind}: ${resource.metadata.name} selector does not exist. selector:\n`,
         resource.spec.selector,
@@ -41,6 +41,20 @@ for (const resource of k8sYAML) {
         `${resource.kind}: ${resource.metadata.name} selector does not exist. selector:\n`,
         resource.spec.selector,
       );
+    }
+  }
+
+  // For now only support rules[].http.paths[].backend.service
+  if (resource.kind == "Ingress") {
+    for (const rule of resource!.spec!.rules) {
+      for (const path of rule!.http!.paths) {
+        if (!doesIngressBackendExist(path.backend, k8sYAML)) {
+          console.log(
+            `${resource.kind}: ${resource.metadata.name}, ${rule.host}, ${path.path} backend does not exist. backend:\n`,
+            path.backend,
+          );
+        }
+      }
     }
   }
 }
@@ -61,7 +75,7 @@ function doesScaleTargetExist(
   return false;
 }
 
-function doesScaleServiceSelectorExist(
+function doesServiceSelectorExist(
   selector: { [key: string]: string },
   resources: any,
 ): boolean {
@@ -89,6 +103,32 @@ function doesPodMonitorSelectorExist(
       ) {
         return true;
       }
+    }
+  }
+  return false;
+}
+
+// This only supports finding service backends
+function doesIngressBackendExist(
+  backend: { service: { name: string; port: { name: string } } },
+  resources: any,
+): boolean {
+  /*
+    For mock services, for example we have a alb ingress that uses actions (https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.2/guide/ingress/annotations/#actions).
+  */
+  if (backend.service.port.name == "use-annotation") {
+    return true;
+  }
+
+  for (const resource of resources) {
+    if (
+      resource.kind == "Service" &&
+      resource.metadata.name == backend.service.name &&
+      resource.spec.ports.some((p: { name: string }) =>
+        p.name == backend.service.port.name
+      )
+    ) {
+      return true;
     }
   }
   return false;

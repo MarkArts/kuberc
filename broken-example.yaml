@@ -524,6 +524,6 @@ spec:
           service:
             name: euc1-testing-example-service
             port:
-              name: api
+              name: portdoesnotexist
         path: /
         pathType: Prefix
