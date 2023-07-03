@@ -31,3 +31,4 @@ kubectl kustomize ../myapp/deploy/overlays/euc1-testing/ | deno run main.ts
 nix-shell
 cat broken-example.yaml | deno run main.ts
 ```
+![image](https://github.com/MarkArts/kube-reference-checker/assets/5372451/1e9ef4df-cb5e-4579-b9f5-807f81ad4ff1)
