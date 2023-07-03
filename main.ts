@@ -2,9 +2,8 @@ import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
 import { parseAll } from "https://deno.land/std@0.192.0/yaml/mod.ts";
 
 const parsedArgs = parse(Deno.args);
-
 let k8sConfig = "";
-if (parsedArgs.__file) {
+if (parsedArgs.file) {
   k8sConfig = await Deno.readTextFile(parsedArgs.__file);
 } else {
   const decoder = new TextDecoder();
@@ -12,6 +11,14 @@ if (parsedArgs.__file) {
     k8sConfig += decoder.decode(chunk);
   }
 }
+
+const skipSecretRefs: string[] = parsedArgs.skip_secrets
+  ? parsedArgs.skip_secrets.split(",")
+  : [];
+
+const skipConfigmapRefs: string[] = parsedArgs.skip_secrets
+  ? parsedArgs.skip_secrets.split(",")
+  : [];
 
 const k8sYAML: any = parseAll(k8sConfig);
 
@@ -84,7 +91,9 @@ for (const resource of k8sYAML) {
       if (container.envFrom) {
         for (const envFrom of container.envFrom) {
           if (
-            envFrom.configMapRef && !envFrom.configMapRef.optional &&
+            envFrom.configMapRef &&
+            !skipConfigmapRefs.includes(envFrom.configMapRef.name) &&
+            !envFrom.configMapRef.optional &&
             !findResource(
               "ConfigMap",
               envFrom.configMapRef.name,
@@ -99,7 +108,9 @@ for (const resource of k8sYAML) {
             }
           }
           if (
-            envFrom.secretRef && !envFrom.secretRef.optional &&
+            envFrom.secretRef &&
+            !skipSecretRefs.includes(envFrom.secretRef.name) &&
+            !envFrom.secretRef.optional &&
             !findResource("Secret", envFrom.secretRef.name, k8sYAML)
           ) {
             console.error(
@@ -115,6 +126,7 @@ for (const resource of k8sYAML) {
         for (const env of container.env) {
           if (
             env.valueFrom?.configMapKeyRef &&
+            !skipConfigmapRefs.includes(env.valueFrom.configMapKeyRef.name) &&
             !env.valueFrom.configMapKeyRef.optional
           ) {
             const configMap = findResource(
@@ -144,7 +156,8 @@ for (const resource of k8sYAML) {
 
           if (
             env.valueFrom?.secretKeyRef &&
-            !env.valueFrom.secretKeyRef.optional
+            !env.valueFrom.secretKeyRef.optional &&
+            !skipSecretRefs.includes(env.valueFrom.secretKeyRef.name)
           ) {
             if (
               isSecretInSopsTemplate(
