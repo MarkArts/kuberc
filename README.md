@@ -10,9 +10,8 @@ what resources should and shouldn't be bundled.
 
 # Setup
 
-Use the nix shell or setup deno yourself. This will also create a .vscode config
-with autocomplete for deno and link vscode the nix installed deno used in the
-shell
+Use the nix shell or setup deno yourself. the nix shell will also create a .vscode config
+with autocomplete for deno and link vscode to the nix installed deno
 
 ```
 nix-shell
@@ -31,3 +30,4 @@ kubectl kustomize ../myapp/deploy/overlays/euc1-testing/ | deno run main.ts
 nix-shell
 cat broken-example.yaml | deno run main.ts
 ```
+![image](https://github.com/MarkArts/kube-reference-checker/assets/5372451/1e9ef4df-cb5e-4579-b9f5-807f81ad4ff1)
