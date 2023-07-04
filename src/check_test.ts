@@ -7,11 +7,20 @@ import {
   checkService,
 } from "./checks.ts";
 
+const pvc = {
+  "apiVersion": "v1",
+  "kind": "PersistentVolumeClaim",
+  "metadata": {
+    "name": "example-efs-claim",
+  },
+  "spec": {},
+};
+
 const deployment = {
   "apiVersion": "apps/v1",
   "kind": "Deployment",
   "metadata": {
-    "name": "euc1-testing-example-flower-deployment",
+    "name": "example-flower-deployment",
   },
   "spec": {
     "selector": {
@@ -32,7 +41,7 @@ const deployment = {
             "envFrom": [
               {
                 "configMapRef": {
-                  "name": "euc1-testing-example-env-2d5b8f6ggb",
+                  "name": "example-env",
                 },
               },
             ],
@@ -50,14 +59,14 @@ const deployment = {
           {
             "configMap": {
               "items": [],
-              "name": "euc1-testing-example-flower-config",
+              "name": "example-config-volume",
             },
             "name": "config",
           },
           {
-            "name": "flower-storage",
+            "name": "example-pvc-volume",
             "persistentVolumeClaim": {
-              "claimName": "euc1-testing-example-efs-claim",
+              "claimName": pvc.metadata.name,
             },
           },
         ],
@@ -117,7 +126,7 @@ const podMonitor = {
   apiVersion: "monitoring.coreos.com/v1",
   kind: "PodMonitor",
   metadata: {
-    name: "euc1-testing-example-flower-pod-monitor",
+    name: "example-pod-monitor",
   },
   spec: {
     podMetricsEndpoints: [
@@ -137,7 +146,7 @@ const hpa = {
   "kind": "HorizontalPodAutoscaler",
   "metadata": {
     "labels": {},
-    "name": "euc1-testing-example-hpa",
+    "name": "example-hpa",
   },
   "spec": {
     "scaleTargetRef": {
@@ -147,6 +156,88 @@ const hpa = {
     },
   },
 };
+
+Deno.test("Test deployment check", async (t) => {
+  const deploymentWithOnlySelfRef = {
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+      "name": "example-deployment",
+    },
+    "spec": {
+      "selector": {
+        "matchLabels": {
+          "app": "example",
+        },
+      },
+      "template": {
+        "metadata": {
+          "labels": {
+            "app": "example",
+          },
+        },
+        "spec": {
+          "containers": [],
+          "volumes": [],
+        },
+      },
+    },
+  };
+
+  await t.step("Check if deployment self reference matches", () => {
+    assertEquals(
+      checkDeploymentOrStateFullSet(deploymentWithOnlySelfRef, []).length,
+      0,
+    );
+  });
+
+  await t.step("Fail deployment check on broken self reference", () => {
+    const deploymentWithOnlyBrokenSelfRef = structuredClone(
+      deploymentWithOnlySelfRef,
+    );
+    // @ts-ignore typescript type fails on adding a key like this
+    deploymentWithOnlyBrokenSelfRef.spec.selector.matchLabels["key2"] =
+      "missing";
+    assertEquals(
+      checkDeploymentOrStateFullSet(deploymentWithOnlyBrokenSelfRef, []).length,
+      1,
+    );
+  });
+
+  await t.step("Check deployment pvc volume references", () => {
+    const dpWithPVC = structuredClone(deploymentWithOnlySelfRef);
+    dpWithPVC.spec.template.spec.volumes = [
+      // @ts-ignore ts complains because dpWithPVC is a static object
+      {
+        "name": "example-pvc-volume",
+        "persistentVolumeClaim": {
+          "claimName": pvc.metadata.name,
+        },
+      },
+    ];
+    assertEquals(
+      checkDeploymentOrStateFullSet(dpWithPVC, [dpWithPVC, pvc]).length,
+      0,
+    );
+  });
+
+  // await t.step("fail deployment on broken pvc volume references", () => {
+  //   const dpWithPVC = { ...deploymentWithOnlySelfRef };
+  //   dpWithPVC.spec.template.spec.volumes = [
+  //     // @ts-ignore ts complains because dpWithPVC is a static object
+  //     {
+  //       "name": "example-pvc-volume",
+  //       "persistentVolumeClaim": {
+  //         "claimName": "does not exist",
+  //       },
+  //     },
+  //   ];
+  //   assertEquals(
+  //     checkDeploymentOrStateFullSet(dpWithPVC, [dpWithPVC, pvc]).length,
+  //     1,
+  //   );
+  // });
+});
 
 Deno.test("Test hpa check", async (t) => {
   await t.step("check for hpa reference existing", () => {
@@ -173,10 +264,10 @@ Deno.test("Test pod monitor", async (t) => {
   });
 
   await t.step("Check for port not existing on selected resource", () => {
-    const brokenPodMonitor = { ...podMonitor };
+    const brokenPodMonitor = structuredClone(podMonitor);
     brokenPodMonitor.spec.podMetricsEndpoints[0].port = "doesnotexist";
     assertEquals(
-      checkPodMonitor(podMonitor, [podMonitor, deployment]).length,
+      checkPodMonitor(brokenPodMonitor, [brokenPodMonitor, deployment]).length,
       1,
     );
   });
@@ -194,8 +285,8 @@ Deno.test("Test ingress check", async (t) => {
   await t.step(
     "Check for issues when service exist but ingress references 2 ports that don't",
     () => {
-      const brokenIngress = { ...ingress };
-      ingress.spec.rules[0].http.paths = [
+      const brokenIngress = structuredClone(ingress);
+      brokenIngress.spec.rules[0].http.paths = [
         {
           path: "/",
           backend: {
@@ -239,7 +330,7 @@ Deno.test("Test service check", async (t) => {
   await t.step(
     "Check for second port not existing on selected resource",
     () => {
-      const brokenService = { ...service };
+      const brokenService = structuredClone(service);
       brokenService.spec.ports = [
         ...brokenService.spec.ports,
         {
@@ -248,7 +339,7 @@ Deno.test("Test service check", async (t) => {
         },
       ];
       assertEquals(
-        checkService(brokenService, [service, deployment]).length,
+        checkService(brokenService, [brokenService, deployment]).length,
         1,
       );
     },

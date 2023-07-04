@@ -387,8 +387,8 @@ type deploymentOrStatefullSet = {
 export function checkDeploymentOrStateFullSet(
   resource: deploymentOrStatefullSet,
   resources: BaseK8SResource[],
-  skipConfigmapRefs: string[],
-  skipSecretRefs: string[],
+  skipConfigmapRefs: string[] = [],
+  skipSecretRefs: string[] = [],
 ): ReferenceCheckIssue[] {
   let issues: ReferenceCheckIssue[] = [];
   // Does not support .spec.selector.matchExpressions
