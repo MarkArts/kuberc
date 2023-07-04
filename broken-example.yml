@@ -485,7 +485,7 @@ metadata:
 spec:
   podMetricsEndpoints:
   - path: /metrics
-    port: flower
+    port: thisportdoesnotexist
   podTargetLabels:
   - app
   - env

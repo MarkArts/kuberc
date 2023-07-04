@@ -77,22 +77,83 @@ export function checkService(
   return [];
 }
 
+class podMetricsEndpointDoesNotExist extends ReferenceCheckIssue {
+  podMetricsEndpoint: { path: string; port: string };
+  selectedResource: BaseK8SResource;
+
+  constructor(
+    resource: BaseK8SResource,
+    podMetricsEndpoint: { path: string; port: string },
+    selectedResource: BaseK8SResource,
+  ) {
+    super(
+      resource,
+      `port ${podMetricsEndpoint.port} not found on resource selected with .spec.selector (${selectedResource.metadata.name})`,
+    );
+
+    this.podMetricsEndpoint = podMetricsEndpoint;
+    this.selectedResource = selectedResource;
+  }
+}
+
 export function checkPodMonitor(
   podMonitor: {
-    spec: { selector: { matchLabels: { [key: string]: string } } };
+    spec: {
+      selector: { matchLabels: { [key: string]: string } };
+      podMetricsEndpoints: { path: string; port: string }[];
+    };
   } & BaseK8SResource,
   resources: BaseK8SResource[],
-) {
-  if (!doesPodMonitorSelectorExist(podMonitor.spec.selector, resources)) {
-    return [
+): ReferenceCheckIssue[] {
+  let issues: ReferenceCheckIssue[] = [];
+  // @ts-ignore we know we will get either a deployment ot sts back
+  const resource:
+    | {
+      spec: {
+        template: {
+          spec: {
+            containers: {
+              ports: {
+                containerPort: string;
+                name: string;
+              }[];
+            }[];
+          };
+        };
+      };
+    } & BaseK8SResource
+    | null = findResourceWithLabels(
+      podMonitor.spec.selector,
+      resources,
+    );
+  if (!resource) {
+    issues = [
+      ...issues,
       new PodSelectorDoesNotExist(
         podMonitor,
         podMonitor.spec.selector.matchLabels,
       ),
     ];
+  } else {
+    for (const podMetricsEndpoint of podMonitor.spec.podMetricsEndpoints) {
+      if (
+        !resource.spec.template.spec.containers.some((c) => {
+          return c.ports.some((p) => p.name == podMetricsEndpoint.port);
+        })
+      ) {
+        issues = [
+          ...issues,
+          new podMetricsEndpointDoesNotExist(
+            podMonitor,
+            podMetricsEndpoint,
+            resource,
+          ),
+        ];
+      }
+    }
   }
 
-  return [];
+  return issues;
 }
 
 type ingressBackend = { service: { name: string; port: { name: string } } };
@@ -389,7 +450,7 @@ export function checkDeploymentOrStateFullSet(
           !env.valueFrom.configMapKeyRef.optional
         ) {
           // @ts-ignore we know that we will get a configmap
-          const configMap: { data: { [key: string]: string } } | undefined =
+          const configMap: { data: { [key: string]: string } } | null =
             findResource(
               "ConfigMap",
               env.valueFrom.configMapKeyRef.name,
@@ -437,7 +498,7 @@ export function checkDeploymentOrStateFullSet(
             )
           ) {
             // @ts-ignore we know we get a secret back
-            const secret: { data: string } | undefined = findResource(
+            const secret: { data: string } | null = findResource(
               "Secret",
               env.valueFrom.secretKeyRef.name,
               resources,
@@ -573,9 +634,9 @@ function doesServiceSelectorExist(
 
 /*
  This will only check if a Deployment or Statefullset will create a replicaSet that will contain
- pods that the podmonitor can target. This does not check for raw pods or replicaSets
+ pods that will match the labels. This does not check for raw pods or replicaSets
 */
-function doesPodMonitorSelectorExist(
+function findResourceWithLabels(
   selector: { matchLabels: { [key: string]: string } },
   resources: {
     spec?: {
@@ -586,7 +647,7 @@ function doesPodMonitorSelectorExist(
       };
     };
   }[] & BaseK8SResource[],
-): boolean {
+): BaseK8SResource | null {
   for (const resource of resources) {
     if (resource?.spec?.template?.metadata?.labels) {
       if (
@@ -595,11 +656,11 @@ function doesPodMonitorSelectorExist(
           resource?.spec?.template?.metadata?.labels,
         )
       ) {
-        return true;
+        return resource;
       }
     }
   }
-  return false;
+  return null;
 }
 
 // This only supports finding service backends and
