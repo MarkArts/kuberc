@@ -602,7 +602,7 @@ function doesPodMonitorSelectorExist(
   return false;
 }
 
-// This only supports finding service backends
+// This only supports finding service backends and
 function doesIngressBackendExist(
   backend: ingressBackend,
   resources:
