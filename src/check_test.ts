@@ -132,6 +132,31 @@ const podMonitor = {
   },
 };
 
+const hpa = {
+  "apiVersion": "autoscaling/v2beta2",
+  "kind": "HorizontalPodAutoscaler",
+  "metadata": {
+    "labels": {},
+    "name": "euc1-testing-example-hpa",
+  },
+  "spec": {
+    "scaleTargetRef": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "name": deployment.metadata.name,
+    },
+  },
+};
+
+Deno.test("Test hpa check", async (t) => {
+  await t.step("check for hpa reference existing", () => {
+    assertEquals(checkHPA(hpa, [hpa, deployment]).length, 0);
+  });
+  await t.step("check for hpa reference not existing", () => {
+    assertEquals(checkHPA(hpa, [hpa]).length, 1);
+  });
+});
+
 Deno.test("Test pod monitor", async (t) => {
   await t.step(
     "check for Podmonitor existing",
