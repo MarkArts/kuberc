@@ -14,10 +14,10 @@ This will not support every possible selector and makes some assumptions to the
 resources.
 
 - It will ignore namespaces and assume the whole input is in the same namespace
+- podselectors will only check the templates of Deployment and Statefullsets,
+  not replicasets, raw pods or otherwise
 - Podmonitor only supports matchlabels
 - Ingress only supports `rules[].http.paths[].backend.service`
-- ServiceSelector/podselectors will only check the templates of Deployment and
-  Statefullsets, not replicasets or raw pods
 
 # Setup
 

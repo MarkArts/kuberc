@@ -7,73 +7,6 @@ import {
   checkService,
 } from "./checks.ts";
 
-const service = {
-  apiVersion: "v1",
-  kind: "Service",
-  metadata: {
-    name: "testService",
-  },
-  spec: {
-    ports: [
-      {
-        name: "api",
-        port: 42,
-      },
-    ],
-  },
-};
-
-const ingress = {
-  apiVersion: "v1",
-  kind: "Ingress",
-  metadata: {
-    name: "testIngress",
-  },
-  spec: {
-    rules: [
-      {
-        host: "testhost",
-        http: {
-          paths: [
-            {
-              path: "/",
-              backend: {
-                service: {
-                  name: service.metadata.name,
-                  port: {
-                    name: "api",
-                  },
-                },
-              },
-            },
-          ],
-        },
-      },
-    ],
-  },
-};
-
-const podMonitor = {
-  apiVersion: "monitoring.coreos.com/v1",
-  kind: "PodMonitor",
-  metadata: {
-    name: "euc1-testing-example-flower-pod-monitor",
-  },
-  spec: {
-    podMetricsEndpoints: [
-      {
-        path: "/metrics",
-        port: "flower",
-      },
-    ],
-    selector: {
-      matchLabels: {
-        "app": "example",
-      },
-    },
-  },
-};
-
 const deployment = {
   "apiVersion": "apps/v1",
   "kind": "Deployment",
@@ -108,7 +41,7 @@ const deployment = {
             "ports": [
               {
                 "containerPort": 5555,
-                "name": "flower",
+                "name": "api",
               },
             ],
           },
@@ -133,6 +66,72 @@ const deployment = {
   },
 };
 
+const service = {
+  apiVersion: "v1",
+  kind: "Service",
+  metadata: {
+    name: "testService",
+  },
+  spec: {
+    ports: [
+      {
+        name: deployment.spec.template.spec.containers[0].ports[0].name,
+        port: 42,
+      },
+    ],
+    selector: deployment.spec.template.metadata.labels,
+  },
+};
+
+const ingress = {
+  apiVersion: "v1",
+  kind: "Ingress",
+  metadata: {
+    name: "testIngress",
+  },
+  spec: {
+    rules: [
+      {
+        host: "testhost",
+        http: {
+          paths: [
+            {
+              path: "/",
+              backend: {
+                service: {
+                  name: service.metadata.name,
+                  port: {
+                    name: service.spec.ports[0].name,
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    ],
+  },
+};
+
+const podMonitor = {
+  apiVersion: "monitoring.coreos.com/v1",
+  kind: "PodMonitor",
+  metadata: {
+    name: "euc1-testing-example-flower-pod-monitor",
+  },
+  spec: {
+    podMetricsEndpoints: [
+      {
+        path: "/metrics",
+        port: deployment.spec.template.spec.containers[0].ports[0].name,
+      },
+    ],
+    selector: {
+      matchLabels: deployment.spec.template.metadata.labels,
+    },
+  },
+};
+
 Deno.test("Test pod monitor", async (t) => {
   await t.step(
     "check for Podmonitor existing",
@@ -144,11 +143,11 @@ Deno.test("Test pod monitor", async (t) => {
     },
   );
 
-  await t.step("Check for no label matching", () => {
+  await t.step("Check for selected resource not existing", () => {
     assertEquals(checkPodMonitor(podMonitor, [podMonitor]).length, 1);
   });
 
-  await t.step("Check label matching but port not existing", () => {
+  await t.step("Check for port not existing on selected resource", () => {
     const brokenPodMonitor = { ...podMonitor };
     brokenPodMonitor.spec.podMetricsEndpoints[0].port = "doesnotexist";
     assertEquals(
@@ -198,6 +197,34 @@ Deno.test("Test ingress check", async (t) => {
       assertEquals(
         checkIngress(brokenIngress, [brokenIngress, service]).length,
         2,
+      );
+    },
+  );
+});
+
+Deno.test("Test service check", async (t) => {
+  await t.step("Selected resource exists", () => {
+    assertEquals(checkService(service, [service, deployment]).length, 0);
+  });
+
+  await t.step("Check for selected resource not existing", () => {
+    assertEquals(checkService(service, [service]).length, 1);
+  });
+
+  await t.step(
+    "Check for second port not existing on selected resource",
+    () => {
+      const brokenService = { ...service };
+      brokenService.spec.ports = [
+        ...brokenService.spec.ports,
+        {
+          name: "brokenport",
+          port: 24,
+        },
+      ];
+      assertEquals(
+        checkService(brokenService, [service, deployment]).length,
+        1,
       );
     },
   );

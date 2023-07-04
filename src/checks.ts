@@ -59,41 +59,86 @@ class PodSelectorDoesNotExist extends ReferenceCheckIssue {
   }
 }
 
+class portDoesNotExistOnResource extends ReferenceCheckIssue {
+  portName: string;
+  selectedResource: BaseK8SResource;
+
+  constructor(
+    resource: BaseK8SResource,
+    portName: string,
+    selectedResource: BaseK8SResource,
+  ) {
+    super(
+      resource,
+      `port ${portName} not found on resource selected with .spec.selector (${selectedResource.kind} ${selectedResource.metadata.name})`,
+    );
+
+    this.portName = portName;
+    this.selectedResource = selectedResource;
+  }
+}
+
 export function checkService(
   service: {
-    spec: { selector: { [key: string]: string } };
+    spec: {
+      ports: {
+        name: string;
+        port: number;
+      }[];
+      selector: { [key: string]: string };
+    };
   } & BaseK8SResource,
   resources: BaseK8SResource[],
 ): ReferenceCheckIssue[] {
-  if (!doesServiceSelectorExist(service.spec.selector, resources)) {
-    return [
+  let issues: ReferenceCheckIssue[] = [];
+  // @ts-ignore we know we will get either a deployment ot sts back
+  const resource:
+    | {
+      spec: {
+        template: {
+          spec: {
+            containers: {
+              ports: {
+                containerPort: string;
+                name: string;
+              }[];
+            }[];
+          };
+        };
+      };
+    } & BaseK8SResource
+    | null = findResourceWithLabels(
+      service.spec.selector,
+      resources,
+    );
+  if (!resource) {
+    issues = [
+      ...issues,
       new PodSelectorDoesNotExist(
         service,
         service.spec.selector,
       ),
     ];
+  } else {
+    for (const port of service.spec.ports) {
+      if (
+        !resource.spec.template.spec.containers.some((c) => {
+          return c.ports.some((p) => p.name == port.name);
+        })
+      ) {
+        issues = [
+          ...issues,
+          new portDoesNotExistOnResource(
+            service,
+            port.name,
+            resource,
+          ),
+        ];
+      }
+    }
   }
 
-  return [];
-}
-
-class podMetricsEndpointDoesNotExist extends ReferenceCheckIssue {
-  podMetricsEndpoint: { path: string; port: string };
-  selectedResource: BaseK8SResource;
-
-  constructor(
-    resource: BaseK8SResource,
-    podMetricsEndpoint: { path: string; port: string },
-    selectedResource: BaseK8SResource,
-  ) {
-    super(
-      resource,
-      `port ${podMetricsEndpoint.port} not found on resource selected with .spec.selector (${selectedResource.metadata.name})`,
-    );
-
-    this.podMetricsEndpoint = podMetricsEndpoint;
-    this.selectedResource = selectedResource;
-  }
+  return issues;
 }
 
 export function checkPodMonitor(
@@ -123,7 +168,7 @@ export function checkPodMonitor(
       };
     } & BaseK8SResource
     | null = findResourceWithLabels(
-      podMonitor.spec.selector,
+      podMonitor.spec.selector.matchLabels,
       resources,
     );
   if (!resource) {
@@ -143,9 +188,9 @@ export function checkPodMonitor(
       ) {
         issues = [
           ...issues,
-          new podMetricsEndpointDoesNotExist(
+          new portDoesNotExistOnResource(
             podMonitor,
-            podMetricsEndpoint,
+            podMetricsEndpoint.port,
             resource,
           ),
         ];
@@ -608,36 +653,10 @@ function doesScaleTargetExist(
 
 /*
  This will only check if a Deployment or Statefullset will create a replicaSet that will contain
- pods that the service selector can target. This does not check for raw pods or replicaSets
-*/
-function doesServiceSelectorExist(
-  selector: { [key: string]: string },
-  resources: {
-    spec?: {
-      template: {
-        metadata: {
-          labels: { [key: string]: string };
-        };
-      };
-    };
-  }[] & BaseK8SResource[],
-): boolean {
-  for (const resource of resources) {
-    if (resource.spec?.template?.metadata?.labels) {
-      if (labelsMatch(selector, resource?.spec?.template?.metadata?.labels)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-/*
- This will only check if a Deployment or Statefullset will create a replicaSet that will contain
  pods that will match the labels. This does not check for raw pods or replicaSets
 */
 function findResourceWithLabels(
-  selector: { matchLabels: { [key: string]: string } },
+  labels: { [key: string]: string },
   resources: {
     spec?: {
       template: {
@@ -652,7 +671,7 @@ function findResourceWithLabels(
     if (resource?.spec?.template?.metadata?.labels) {
       if (
         labelsMatch(
-          selector.matchLabels,
+          labels,
           resource?.spec?.template?.metadata?.labels,
         )
       ) {
