@@ -16,6 +16,17 @@ const pvc = {
   "spec": {},
 };
 
+const configMap = {
+  "apiVersion": "v1",
+  "data": {
+    "key": "42",
+  },
+  "kind": "ConfigMap",
+  "metadata": {
+    "name": "example-cm",
+  },
+};
+
 const deployment = {
   "apiVersion": "apps/v1",
   "kind": "Deployment",
@@ -58,8 +69,11 @@ const deployment = {
         "volumes": [
           {
             "configMap": {
-              "items": [],
-              "name": "example-config-volume",
+              "items": [{
+                "key": configMap.data.key,
+                "path": "/",
+              }],
+              "name": configMap.metadata.name,
             },
             "name": "config",
           },
@@ -221,22 +235,88 @@ Deno.test("Test deployment check", async (t) => {
     );
   });
 
-  // await t.step("fail deployment on broken pvc volume references", () => {
-  //   const dpWithPVC = { ...deploymentWithOnlySelfRef };
-  //   dpWithPVC.spec.template.spec.volumes = [
-  //     // @ts-ignore ts complains because dpWithPVC is a static object
-  //     {
-  //       "name": "example-pvc-volume",
-  //       "persistentVolumeClaim": {
-  //         "claimName": "does not exist",
-  //       },
-  //     },
-  //   ];
-  //   assertEquals(
-  //     checkDeploymentOrStateFullSet(dpWithPVC, [dpWithPVC, pvc]).length,
-  //     1,
-  //   );
-  // });
+  await t.step("fail deployment on broken pvc volume references", () => {
+    const dpWithPVC = structuredClone(deploymentWithOnlySelfRef);
+    dpWithPVC.spec.template.spec.volumes = [
+      // @ts-ignore ts complains because dpWithPVC is a static object
+      {
+        "name": "example-pvc-volume",
+        "persistentVolumeClaim": {
+          "claimName": "doesnotexist",
+        },
+      },
+    ];
+    assertEquals(
+      checkDeploymentOrStateFullSet(dpWithPVC, [dpWithPVC, pvc]).length,
+      1,
+    );
+  });
+
+  await t.step("Check deployment configmap volume references", () => {
+    const dpWithCMVolume = structuredClone(deploymentWithOnlySelfRef);
+    dpWithCMVolume.spec.template.spec.volumes = [
+      // @ts-ignore ts complains because dpWithCMVolume is a static object
+      {
+        "name": "example-cm-volume",
+        "configMap": {
+          "items": [{
+            "key": configMap.data.key,
+            "path": "/",
+          }],
+          "name": configMap.metadata.name,
+        },
+      },
+    ];
+    assertEquals(
+      checkDeploymentOrStateFullSet(dpWithCMVolume, [dpWithCMVolume, configMap])
+        .length,
+      0,
+    );
+  });
+
+  await t.step("Check deployment configmap volume with broken ref", () => {
+    const dpWithCMVolume = structuredClone(deploymentWithOnlySelfRef);
+    dpWithCMVolume.spec.template.spec.volumes = [
+      // @ts-ignore ts complains because dpWithCMVolume is a static object
+      {
+        "name": "example-cm-volume",
+        "configMap": {
+          "items": [{
+            "key": configMap.data.key,
+            "path": "/",
+          }],
+          "name": "thiscmdoesnotexist",
+        },
+      },
+    ];
+    assertEquals(
+      checkDeploymentOrStateFullSet(dpWithCMVolume, [dpWithCMVolume, configMap])
+        .length,
+      1,
+    );
+  });
+
+  await t.step("Check deployment configmap volume with broken key ref", () => {
+    const dpWithCMVolume = structuredClone(deploymentWithOnlySelfRef);
+    dpWithCMVolume.spec.template.spec.volumes = [
+      // @ts-ignore ts complains because dpWithCMVolume is a static object
+      {
+        "name": "example-cm-volume",
+        "configMap": {
+          "items": [{
+            "key": "thiskeydoesnotexist",
+            "path": "/",
+          }],
+          "name": configMap.metadata.name,
+        },
+      },
+    ];
+    assertEquals(
+      checkDeploymentOrStateFullSet(dpWithCMVolume, [dpWithCMVolume, configMap])
+        .length,
+      1,
+    );
+  });
 });
 
 Deno.test("Test hpa check", async (t) => {
