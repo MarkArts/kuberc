@@ -495,7 +495,7 @@ export function checkDeploymentOrStateFullSet(
             ...issues,
             new SecretRefDoesNotExist(
               resource,
-              envFrom.secretRef,
+              envFrom.secretRef.name,
               ".spec.template.spec.containers|initContainers[].envFrom.secretRef",
             ),
           ];
@@ -570,7 +570,7 @@ export function checkDeploymentOrStateFullSet(
                 ...issues,
                 new SecretRefDoesNotExist(
                   resource,
-                  env.valueFrom.secretKeyRef,
+                  env.valueFrom.secretKeyRef.name,
                   ".spec.template.spec.containers|initContainers[].env[].secretKeyRef",
                 ),
               ];
@@ -584,8 +584,8 @@ export function checkDeploymentOrStateFullSet(
                   ...issues,
                   new SecretKeyDoesNotExist(
                     resource,
-                    container,
-                    env.valueFrom.secretKeyRef,
+                    env.valueFrom.secretKeyRef.name,
+                    env.valueFrom.secretKeyRef.key,
                     ".spec.template.spec.containers|initContainers[].env[].secretKeyRef",
                   ),
                 ];

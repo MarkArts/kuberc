@@ -21,12 +21,12 @@ if (parsedArgs.file) {
   }
 }
 
-const skipSecretRefs: string[] = parsedArgs.skip_secrets
-  ? parsedArgs.skip_secrets.split(",")
+const skipSecretRefs: string[] = parsedArgs["skip-secrets"]
+  ? parsedArgs["skip-secrets"].split(",")
   : [];
 
-const skipConfigmapRefs: string[] = parsedArgs.skip_secrets
-  ? parsedArgs.skip_secrets.split(",")
+const skipConfigmapRefs: string[] = parsedArgs["skip-configmaps"]
+  ? parsedArgs["skip-configmaps"].split(",")
   : [];
 
 const verbose: boolean = parsedArgs.verbose ? parsedArgs.verbose : false;
