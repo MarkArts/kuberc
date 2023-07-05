@@ -278,90 +278,84 @@ class VolumeDoesNotExist extends ReferenceCheckIssue {
   }
 }
 
-class ContainerConfigmapRefDoesNotExist extends ReferenceCheckIssue {
-  container: any;
-  configMapRef: any;
+class ConfigmapRefDoesNotExist extends ReferenceCheckIssue {
+  configMapName: string;
   configKey: string;
 
   constructor(
     resource: BaseK8SResource,
-    container: any,
-    configMapRef: any,
+    configMapName: string,
     configKey: string,
   ) {
     super(
       resource,
-      `${configKey} references configmap (${configMapRef.name}) which doesn't exist`,
+      `${configKey} references configmap (${configMapName}) which doesn't exist`,
     );
 
-    this.container = container;
-    this.configMapRef = configMapRef;
+    this.configMapName = configMapName;
     this.configKey = configKey;
   }
 }
 
-class ContainerConfigmapKeyDoesNotExist extends ReferenceCheckIssue {
-  container: any;
-  configMapKeyRef: any;
+class ConfigmapKeyDoesNotExist extends ReferenceCheckIssue {
+  configMapName: string;
+  configMapKey: string;
   configKey: string;
 
   constructor(
     resource: BaseK8SResource,
-    container: any,
-    configMapKeyRef: any,
+    configMapName: string,
+    configMapKey: string,
     configKey: string,
   ) {
     super(
       resource,
-      `${configKey} references the key (${configMapKeyRef.key}) of configmap (${configMapKeyRef.name}) which doesn't exist`,
+      `${configKey} references key (${configMapKey}) of configmap (${configMapName}) which doesn't exist`,
     );
 
-    this.container = container;
-    this.configMapKeyRef = configMapKeyRef;
+    this.configMapName = configMapName;
+    this.configMapKey = configMapKey;
     this.configKey = configKey;
   }
 }
 
-class ContainerSecretRefDoesNotExist extends ReferenceCheckIssue {
-  secretRef: any;
-  container: any;
+class SecretRefDoesNotExist extends ReferenceCheckIssue {
+  secretName: string;
   configKey: string;
 
   constructor(
     resource: BaseK8SResource,
-    container: any,
-    secretRef: any,
+    secretName: string,
     configKey: string,
   ) {
     super(
       resource,
-      `${configKey} references secret (${secretRef.name}) that does not exist`,
+      `${configKey} references secret (${secretName}) which doesn't exist`,
     );
 
-    this.container = container;
-    this.secretRef = secretRef;
+    this.secretName = secretName;
     this.configKey = configKey;
   }
 }
 
-class ContainerSecretKeyDoesNotExist extends ReferenceCheckIssue {
-  container: any;
-  secretKeyRef: any;
+class SecretKeyDoesNotExist extends ReferenceCheckIssue {
+  secretName: string;
+  secretKey: string;
   configKey: string;
 
   constructor(
     resource: BaseK8SResource,
-    container: any,
-    secretKeyRef: any,
+    secretName: string,
+    secretKey: string,
     configKey: string,
   ) {
     super(
       resource,
-      `${configKey} references the key (${secretKeyRef.key}) of secret (${secretKeyRef.name}) which doesn't exist`,
+      `${configKey} references key (${secretKey}) of secret (${secretName}) which doesn't exist`,
     );
 
-    this.container = container;
-    this.secretKeyRef = secretKeyRef;
+    this.secretName = secretName;
+    this.secretKey = secretKey;
     this.configKey = configKey;
   }
 }
@@ -374,7 +368,7 @@ type deploymentOrStatefullSet = {
       spec: {
         volumes?: {
           name: string;
-          configMap?: { name: string };
+          configMap?: { name: string; items: { key: string; path: string }[] };
           persistentVolumeClaim?: { claimName: string };
         }[];
         containers?: any;
@@ -408,7 +402,6 @@ export function checkDeploymentOrStateFullSet(
   }
 
   if (resource.spec.template.spec.volumes) {
-    // Only supports configmap and persistentVolumeClain
     for (const volume of resource.spec.template.spec.volumes) {
       if (volume.configMap) {
         if (!findResource("ConfigMap", volume.configMap.name, resources)) {
@@ -416,6 +409,32 @@ export function checkDeploymentOrStateFullSet(
             ...issues,
             new VolumeDoesNotExist(resource, volume),
           ];
+        } else {
+          // @ts-ignore we know that we will get a configmap
+          const configMap: { data: { [key: string]: string } } | null =
+            findResource("ConfigMap", volume.configMap.name, resources);
+          if (!configMap) {
+            issues = [
+              ...issues,
+              new VolumeDoesNotExist(resource, volume),
+            ];
+          } else {
+            for (const { key, path } of volume.configMap.items) {
+              if (
+                !Object.keys(configMap.data).some((k) => k == key)
+              ) {
+                issues = [
+                  ...issues,
+                  new ConfigmapKeyDoesNotExist(
+                    resource,
+                    volume.configMap.name,
+                    key,
+                    ".spec.template.spec.volumes[].configmap.items[].key",
+                  ),
+                ];
+              }
+            }
+          }
         }
       }
 
@@ -458,11 +477,10 @@ export function checkDeploymentOrStateFullSet(
           {
             issues = [
               ...issues,
-              new ContainerConfigmapRefDoesNotExist(
+              new ConfigmapRefDoesNotExist(
                 resource,
-                container,
                 envFrom.configMapRef,
-                ".spec.template.spec.containers[].envFrom.configMapRef",
+                ".spec.template.spec.containers|initContainers[].envFrom.configMapRef",
               ),
             ];
           }
@@ -475,11 +493,10 @@ export function checkDeploymentOrStateFullSet(
         ) {
           issues = [
             ...issues,
-            new ContainerSecretRefDoesNotExist(
+            new SecretRefDoesNotExist(
               resource,
-              container,
               envFrom.secretRef,
-              ".spec.template.spec.containers[].envFrom.secretRef",
+              ".spec.template.spec.containers|initContainers[].envFrom.secretRef",
             ),
           ];
         }
@@ -504,11 +521,10 @@ export function checkDeploymentOrStateFullSet(
           if (!configMap) {
             issues = [
               ...issues,
-              new ContainerConfigmapRefDoesNotExist(
+              new ConfigmapRefDoesNotExist(
                 resource,
-                container,
                 env.valueFrom.configMapKeyRef,
-                ".spec.template.spec.containers[].env[].configMapKeyRef",
+                ".spec.template.spec.containers|initContainers[].env[].configMapKeyRef",
               ),
             ];
           } else {
@@ -519,11 +535,11 @@ export function checkDeploymentOrStateFullSet(
             ) {
               issues = [
                 ...issues,
-                new ContainerConfigmapKeyDoesNotExist(
+                new ConfigmapKeyDoesNotExist(
                   resource,
-                  container,
-                  env.valueFrom.configMapKeyRef,
-                  ".spec.template.spec.containers[].env[].configMapKeyRef",
+                  env.valueFrom.configMapKeyRef.name,
+                  env.valueFrom.configMapKeyRef.key,
+                  ".spec.template.spec.containers|initContainers[].env[].configMapKeyRef",
                 ),
               ];
             }
@@ -552,11 +568,10 @@ export function checkDeploymentOrStateFullSet(
             if (!secret) {
               issues = [
                 ...issues,
-                new ContainerSecretRefDoesNotExist(
+                new SecretRefDoesNotExist(
                   resource,
-                  container,
                   env.valueFrom.secretKeyRef,
-                  ".spec.template.spec.containers[].env[].secretKeyRef",
+                  ".spec.template.spec.containers|initContainers[].env[].secretKeyRef",
                 ),
               ];
             } else {
@@ -567,11 +582,11 @@ export function checkDeploymentOrStateFullSet(
               ) {
                 issues = [
                   ...issues,
-                  new ContainerSecretKeyDoesNotExist(
+                  new SecretKeyDoesNotExist(
                     resource,
                     container,
                     env.valueFrom.secretKeyRef,
-                    ".spec.template.spec.containers[].env[].secretKeyRef",
+                    ".spec.template.spec.containers|initContainers[].env[].secretKeyRef",
                   ),
                 ];
               }

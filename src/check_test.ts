@@ -70,7 +70,7 @@ const deployment = {
           {
             "configMap": {
               "items": [{
-                "key": configMap.data.key,
+                "key": Object.keys(configMap.data)[0],
                 "path": "/",
               }],
               "name": configMap.metadata.name,
@@ -209,7 +209,7 @@ Deno.test("Test deployment check", async (t) => {
     const deploymentWithOnlyBrokenSelfRef = structuredClone(
       deploymentWithOnlySelfRef,
     );
-    // @ts-ignore typescript type fails on adding a key like this
+    // @ts-ignore ts complains because it's is an untyped static object
     deploymentWithOnlyBrokenSelfRef.spec.selector.matchLabels["key2"] =
       "missing";
     assertEquals(
@@ -221,7 +221,7 @@ Deno.test("Test deployment check", async (t) => {
   await t.step("Check deployment pvc volume references", () => {
     const dpWithPVC = structuredClone(deploymentWithOnlySelfRef);
     dpWithPVC.spec.template.spec.volumes = [
-      // @ts-ignore ts complains because dpWithPVC is a static object
+      // @ts-ignore ts complains because it's is an untyped static object
       {
         "name": "example-pvc-volume",
         "persistentVolumeClaim": {
@@ -238,7 +238,7 @@ Deno.test("Test deployment check", async (t) => {
   await t.step("fail deployment on broken pvc volume references", () => {
     const dpWithPVC = structuredClone(deploymentWithOnlySelfRef);
     dpWithPVC.spec.template.spec.volumes = [
-      // @ts-ignore ts complains because dpWithPVC is a static object
+      // @ts-ignore ts complains because it's is an untyped static object
       {
         "name": "example-pvc-volume",
         "persistentVolumeClaim": {
@@ -255,18 +255,25 @@ Deno.test("Test deployment check", async (t) => {
   await t.step("Check deployment configmap volume references", () => {
     const dpWithCMVolume = structuredClone(deploymentWithOnlySelfRef);
     dpWithCMVolume.spec.template.spec.volumes = [
-      // @ts-ignore ts complains because dpWithCMVolume is a static object
+      // @ts-ignore ts complains because it's is an untyped static object
       {
         "name": "example-cm-volume",
         "configMap": {
           "items": [{
-            "key": configMap.data.key,
+            "key": Object.keys(configMap.data)[0],
             "path": "/",
           }],
           "name": configMap.metadata.name,
         },
       },
     ];
+
+    console.log(
+      checkDeploymentOrStateFullSet(dpWithCMVolume, [
+        dpWithCMVolume,
+        configMap,
+      ]),
+    );
     assertEquals(
       checkDeploymentOrStateFullSet(dpWithCMVolume, [dpWithCMVolume, configMap])
         .length,
@@ -277,12 +284,12 @@ Deno.test("Test deployment check", async (t) => {
   await t.step("Check deployment configmap volume with broken ref", () => {
     const dpWithCMVolume = structuredClone(deploymentWithOnlySelfRef);
     dpWithCMVolume.spec.template.spec.volumes = [
-      // @ts-ignore ts complains because dpWithCMVolume is a static object
+      // @ts-ignore ts complains because it's is an untyped static object
       {
         "name": "example-cm-volume",
         "configMap": {
           "items": [{
-            "key": configMap.data.key,
+            "key": Object.keys(configMap.data)[0],
             "path": "/",
           }],
           "name": "thiscmdoesnotexist",
@@ -299,7 +306,7 @@ Deno.test("Test deployment check", async (t) => {
   await t.step("Check deployment configmap volume with broken key ref", () => {
     const dpWithCMVolume = structuredClone(deploymentWithOnlySelfRef);
     dpWithCMVolume.spec.template.spec.volumes = [
-      // @ts-ignore ts complains because dpWithCMVolume is a static object
+      // @ts-ignore ts complains because it's is an untyped static object
       {
         "name": "example-cm-volume",
         "configMap": {
