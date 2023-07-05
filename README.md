@@ -30,7 +30,7 @@ Current CRDS that are support are:
 | ----------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
 | --skip-secrets    | deno run main.ts --skip-secrets newrelic-license,s3-bucket    | Ignore references to secrets in the given list               |
 | --skip-configmaps | deno run main.ts --skip-configmaps newrelic-license,s3-bucket | Ignore references to configmaps in the given list            |
-| --skip-services   | deno run main.ts --skip-services ingress-service,             | Ignore references to services in the given list              |
+| --skip-services   | deno run main.ts --skip-services external-ingress-service     | Ignore references to services in the given list              |
 | --verbose         | deno run main.ts --verbose                                    | Output the issues in json format instead of the readable msg |
 
 # Setup
