@@ -1,7 +1,7 @@
 # kuberc
 
 ```
-deno run http://deno.land/x/kuberc@v4/main.ts --help
+deno run https://deno.land/x/kuberc@v4/main.ts --help
 ```
 
 Kuberc (kube reference checker) is a tool that will check if references to other
