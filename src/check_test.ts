@@ -27,6 +27,17 @@ const configMap = {
   },
 };
 
+const secret = {
+  "apiVersion": "v1",
+  "data": {
+    "key": "42",
+  },
+  "kind": "Secret",
+  "metadata": {
+    "name": "example-secret",
+  },
+};
+
 const deployment = {
   "apiVersion": "apps/v1",
   "kind": "Deployment",
@@ -401,6 +412,99 @@ Deno.test("Test deployment check", async (t) => {
           dpWithCMEnvFrom,
           configMap,
         ], ["doesNotExist"])
+          .length,
+        0,
+      );
+    },
+  );
+
+  await t.step("Check deployment envFrom secret", () => {
+    const dpWithSecretEnvFrom = structuredClone(deploymentWithOnlySelfRef);
+    dpWithSecretEnvFrom.spec.template.spec.containers[0] = {
+      // @ts-ignore ts complains because it's is an untyped static object
+      envFrom: [{
+        secretRef: {
+          name: secret.metadata.name,
+        },
+      }],
+    };
+    assertEquals(
+      checkDeploymentOrStateFullSet(dpWithSecretEnvFrom, [
+        dpWithSecretEnvFrom,
+        secret,
+      ])
+        .length,
+      0,
+    );
+  });
+
+  await t.step("Check deployment with missing envFrom secretRef", () => {
+    const dpWithSecretEnvFrom = structuredClone(deploymentWithOnlySelfRef);
+    dpWithSecretEnvFrom.spec.template.spec.containers[0] = {
+      // @ts-ignore ts complains because it's is an untyped static object
+      envFrom: [{
+        secretRef: {
+          name: "doesNotExist",
+        },
+      }],
+    };
+    assertEquals(
+      checkDeploymentOrStateFullSet(dpWithSecretEnvFrom, [
+        dpWithSecretEnvFrom,
+        secret,
+      ])
+        .length,
+      1,
+    );
+  });
+
+  await t.step(
+    "Check deployment with missing envFrom secretRef but optional",
+    () => {
+      const dpWithSecretEnvFrom = structuredClone(deploymentWithOnlySelfRef);
+      dpWithSecretEnvFrom.spec.template.spec.containers[0] = {
+        // @ts-ignore ts complains because it's is an untyped static object
+        envFrom: [{
+          secretRef: {
+            optional: true,
+            name: "doesNotExist",
+          },
+        }],
+      };
+      assertEquals(
+        checkDeploymentOrStateFullSet(dpWithSecretEnvFrom, [
+          dpWithSecretEnvFrom,
+          secret,
+        ])
+          .length,
+        0,
+      );
+    },
+  );
+
+  await t.step(
+    "Check deployment with a skipped missing envFrom secretRef",
+    () => {
+      const dpWithSecretEnvFrom = structuredClone(deploymentWithOnlySelfRef);
+      dpWithSecretEnvFrom.spec.template.spec.containers[0] = {
+        // @ts-ignore ts complains because it's is an untyped static object
+        envFrom: [{
+          secretRef: {
+            optional: true,
+            name: "doesNotExist",
+          },
+        }],
+      };
+      assertEquals(
+        checkDeploymentOrStateFullSet(
+          dpWithSecretEnvFrom,
+          [
+            dpWithSecretEnvFrom,
+            secret,
+          ],
+          [],
+          ["doesNotExist"],
+        )
           .length,
         0,
       );
