@@ -523,7 +523,7 @@ export function checkDeploymentOrStateFullSet(
               ...issues,
               new ConfigmapRefDoesNotExist(
                 resource,
-                env.valueFrom.configMapKeyRef,
+                env.valueFrom.configMapKeyRef.name,
                 ".spec.template.spec.containers|initContainers[].env[].configMapKeyRef",
               ),
             ];

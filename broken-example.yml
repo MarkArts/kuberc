@@ -334,6 +334,8 @@ spec:
         - name: BROKER_URL
           value: amqp://$(example_RABBITMQ_USER):$(example_RABBITMQ_PASSWORD)@$(example_RABBITMQ_HOST):$(example_RABBITMQ_PORT)/$(example_RABBITMQ_VHOST)
         envFrom:
+        - secretRef:
+            name: doesnotexist
         - configMapRef:
             name: euc1-testing-example-env-2d5b8f6ggb
         image: mher/flower:1.2

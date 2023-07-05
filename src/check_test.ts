@@ -230,8 +230,8 @@ Deno.test("Test deployment check", async (t) => {
   });
 
   await t.step("Check deployment pvc volume references", () => {
-    const dpWithPVC = structuredClone(deploymentWithOnlySelfRef);
-    dpWithPVC.spec.template.spec.volumes = [
+    const dp = structuredClone(deploymentWithOnlySelfRef);
+    dp.spec.template.spec.volumes = [
       // @ts-ignore ts complains because it's is an untyped static object
       {
         "name": "example-pvc-volume",
@@ -241,14 +241,14 @@ Deno.test("Test deployment check", async (t) => {
       },
     ];
     assertEquals(
-      checkDeploymentOrStateFullSet(dpWithPVC, [dpWithPVC, pvc]).length,
+      checkDeploymentOrStateFullSet(dp, [dp, pvc]).length,
       0,
     );
   });
 
   await t.step("fail deployment on broken pvc volume references", () => {
-    const dpWithPVC = structuredClone(deploymentWithOnlySelfRef);
-    dpWithPVC.spec.template.spec.volumes = [
+    const dp = structuredClone(deploymentWithOnlySelfRef);
+    dp.spec.template.spec.volumes = [
       // @ts-ignore ts complains because it's is an untyped static object
       {
         "name": "example-pvc-volume",
@@ -258,14 +258,14 @@ Deno.test("Test deployment check", async (t) => {
       },
     ];
     assertEquals(
-      checkDeploymentOrStateFullSet(dpWithPVC, [dpWithPVC, pvc]).length,
+      checkDeploymentOrStateFullSet(dp, [dp, pvc]).length,
       1,
     );
   });
 
   await t.step("Check deployment configmap volume references", () => {
-    const dpWithCMVolume = structuredClone(deploymentWithOnlySelfRef);
-    dpWithCMVolume.spec.template.spec.volumes = [
+    const dp = structuredClone(deploymentWithOnlySelfRef);
+    dp.spec.template.spec.volumes = [
       // @ts-ignore ts complains because it's is an untyped static object
       {
         "name": "example-cm-volume",
@@ -280,15 +280,15 @@ Deno.test("Test deployment check", async (t) => {
     ];
 
     assertEquals(
-      checkDeploymentOrStateFullSet(dpWithCMVolume, [dpWithCMVolume, configMap])
+      checkDeploymentOrStateFullSet(dp, [dp, configMap])
         .length,
       0,
     );
   });
 
   await t.step("Check deployment configmap volume with broken ref", () => {
-    const dpWithCMVolume = structuredClone(deploymentWithOnlySelfRef);
-    dpWithCMVolume.spec.template.spec.volumes = [
+    const dp = structuredClone(deploymentWithOnlySelfRef);
+    dp.spec.template.spec.volumes = [
       // @ts-ignore ts complains because it's is an untyped static object
       {
         "name": "example-cm-volume",
@@ -302,15 +302,15 @@ Deno.test("Test deployment check", async (t) => {
       },
     ];
     assertEquals(
-      checkDeploymentOrStateFullSet(dpWithCMVolume, [dpWithCMVolume, configMap])
+      checkDeploymentOrStateFullSet(dp, [dp, configMap])
         .length,
       1,
     );
   });
 
   await t.step("Check deployment configmap volume with broken key ref", () => {
-    const dpWithCMVolume = structuredClone(deploymentWithOnlySelfRef);
-    dpWithCMVolume.spec.template.spec.volumes = [
+    const dp = structuredClone(deploymentWithOnlySelfRef);
+    dp.spec.template.spec.volumes = [
       // @ts-ignore ts complains because it's is an untyped static object
       {
         "name": "example-cm-volume",
@@ -324,15 +324,15 @@ Deno.test("Test deployment check", async (t) => {
       },
     ];
     assertEquals(
-      checkDeploymentOrStateFullSet(dpWithCMVolume, [dpWithCMVolume, configMap])
+      checkDeploymentOrStateFullSet(dp, [dp, configMap])
         .length,
       1,
     );
   });
 
   await t.step("Check deployment envFrom configmap", () => {
-    const dpWithCMEnvFrom = structuredClone(deploymentWithOnlySelfRef);
-    dpWithCMEnvFrom.spec.template.spec.containers[0] = {
+    const dp = structuredClone(deploymentWithOnlySelfRef);
+    dp.spec.template.spec.containers[0] = {
       // @ts-ignore ts complains because it's is an untyped static object
       envFrom: [{
         configMapRef: {
@@ -341,8 +341,8 @@ Deno.test("Test deployment check", async (t) => {
       }],
     };
     assertEquals(
-      checkDeploymentOrStateFullSet(dpWithCMEnvFrom, [
-        dpWithCMEnvFrom,
+      checkDeploymentOrStateFullSet(dp, [
+        dp,
         configMap,
       ])
         .length,
@@ -351,8 +351,8 @@ Deno.test("Test deployment check", async (t) => {
   });
 
   await t.step("Check deployment with missing envFrom configmap", () => {
-    const dpWithCMEnvFrom = structuredClone(deploymentWithOnlySelfRef);
-    dpWithCMEnvFrom.spec.template.spec.containers[0] = {
+    const dp = structuredClone(deploymentWithOnlySelfRef);
+    dp.spec.template.spec.containers[0] = {
       // @ts-ignore ts complains because it's is an untyped static object
       envFrom: [{
         configMapRef: {
@@ -361,8 +361,8 @@ Deno.test("Test deployment check", async (t) => {
       }],
     };
     assertEquals(
-      checkDeploymentOrStateFullSet(dpWithCMEnvFrom, [
-        dpWithCMEnvFrom,
+      checkDeploymentOrStateFullSet(dp, [
+        dp,
         configMap,
       ])
         .length,
@@ -373,8 +373,8 @@ Deno.test("Test deployment check", async (t) => {
   await t.step(
     "Check deployment with missing envFrom configmap but optional",
     () => {
-      const dpWithCMEnvFrom = structuredClone(deploymentWithOnlySelfRef);
-      dpWithCMEnvFrom.spec.template.spec.containers[0] = {
+      const dp = structuredClone(deploymentWithOnlySelfRef);
+      dp.spec.template.spec.containers[0] = {
         // @ts-ignore ts complains because it's is an untyped static object
         envFrom: [{
           configMapRef: {
@@ -384,8 +384,8 @@ Deno.test("Test deployment check", async (t) => {
         }],
       };
       assertEquals(
-        checkDeploymentOrStateFullSet(dpWithCMEnvFrom, [
-          dpWithCMEnvFrom,
+        checkDeploymentOrStateFullSet(dp, [
+          dp,
           configMap,
         ])
           .length,
@@ -397,8 +397,8 @@ Deno.test("Test deployment check", async (t) => {
   await t.step(
     "Check deployment with a skipped missing envFrom configmap",
     () => {
-      const dpWithCMEnvFrom = structuredClone(deploymentWithOnlySelfRef);
-      dpWithCMEnvFrom.spec.template.spec.containers[0] = {
+      const dp = structuredClone(deploymentWithOnlySelfRef);
+      dp.spec.template.spec.containers[0] = {
         // @ts-ignore ts complains because it's is an untyped static object
         envFrom: [{
           configMapRef: {
@@ -408,8 +408,8 @@ Deno.test("Test deployment check", async (t) => {
         }],
       };
       assertEquals(
-        checkDeploymentOrStateFullSet(dpWithCMEnvFrom, [
-          dpWithCMEnvFrom,
+        checkDeploymentOrStateFullSet(dp, [
+          dp,
           configMap,
         ], ["doesNotExist"])
           .length,
@@ -419,8 +419,8 @@ Deno.test("Test deployment check", async (t) => {
   );
 
   await t.step("Check deployment envFrom secret", () => {
-    const dpWithSecretEnvFrom = structuredClone(deploymentWithOnlySelfRef);
-    dpWithSecretEnvFrom.spec.template.spec.containers[0] = {
+    const dp = structuredClone(deploymentWithOnlySelfRef);
+    dp.spec.template.spec.containers[0] = {
       // @ts-ignore ts complains because it's is an untyped static object
       envFrom: [{
         secretRef: {
@@ -429,8 +429,8 @@ Deno.test("Test deployment check", async (t) => {
       }],
     };
     assertEquals(
-      checkDeploymentOrStateFullSet(dpWithSecretEnvFrom, [
-        dpWithSecretEnvFrom,
+      checkDeploymentOrStateFullSet(dp, [
+        dp,
         secret,
       ])
         .length,
@@ -439,8 +439,8 @@ Deno.test("Test deployment check", async (t) => {
   });
 
   await t.step("Check deployment with missing envFrom secretRef", () => {
-    const dpWithSecretEnvFrom = structuredClone(deploymentWithOnlySelfRef);
-    dpWithSecretEnvFrom.spec.template.spec.containers[0] = {
+    const dp = structuredClone(deploymentWithOnlySelfRef);
+    dp.spec.template.spec.containers[0] = {
       // @ts-ignore ts complains because it's is an untyped static object
       envFrom: [{
         secretRef: {
@@ -449,8 +449,8 @@ Deno.test("Test deployment check", async (t) => {
       }],
     };
     assertEquals(
-      checkDeploymentOrStateFullSet(dpWithSecretEnvFrom, [
-        dpWithSecretEnvFrom,
+      checkDeploymentOrStateFullSet(dp, [
+        dp,
         secret,
       ])
         .length,
@@ -461,8 +461,8 @@ Deno.test("Test deployment check", async (t) => {
   await t.step(
     "Check deployment with missing envFrom secretRef but optional",
     () => {
-      const dpWithSecretEnvFrom = structuredClone(deploymentWithOnlySelfRef);
-      dpWithSecretEnvFrom.spec.template.spec.containers[0] = {
+      const dp = structuredClone(deploymentWithOnlySelfRef);
+      dp.spec.template.spec.containers[0] = {
         // @ts-ignore ts complains because it's is an untyped static object
         envFrom: [{
           secretRef: {
@@ -472,8 +472,8 @@ Deno.test("Test deployment check", async (t) => {
         }],
       };
       assertEquals(
-        checkDeploymentOrStateFullSet(dpWithSecretEnvFrom, [
-          dpWithSecretEnvFrom,
+        checkDeploymentOrStateFullSet(dp, [
+          dp,
           secret,
         ])
           .length,
@@ -485,8 +485,8 @@ Deno.test("Test deployment check", async (t) => {
   await t.step(
     "Check deployment with a skipped missing envFrom secretRef",
     () => {
-      const dpWithSecretEnvFrom = structuredClone(deploymentWithOnlySelfRef);
-      dpWithSecretEnvFrom.spec.template.spec.containers[0] = {
+      const dp = structuredClone(deploymentWithOnlySelfRef);
+      dp.spec.template.spec.containers[0] = {
         // @ts-ignore ts complains because it's is an untyped static object
         envFrom: [{
           secretRef: {
@@ -497,9 +497,9 @@ Deno.test("Test deployment check", async (t) => {
       };
       assertEquals(
         checkDeploymentOrStateFullSet(
-          dpWithSecretEnvFrom,
+          dp,
           [
-            dpWithSecretEnvFrom,
+            dp,
             secret,
           ],
           [],
@@ -508,6 +508,267 @@ Deno.test("Test deployment check", async (t) => {
           .length,
         0,
       );
+    },
+  );
+
+  await t.step(
+    "Check deployment spec.template.spec.containers[].env[].valueFrom.configMapKeyRef",
+    () => {
+      const dp = structuredClone(deploymentWithOnlySelfRef);
+      dp.spec.template.spec.containers[0] = {
+        // @ts-ignore ts complains because it's is an untyped static object
+        env: [{
+          valueFrom: {
+            configMapKeyRef: {
+              name: configMap.metadata.name,
+              key: Object.keys(configMap.data)[0],
+            },
+          },
+        }],
+      };
+
+      assertEquals(
+        checkDeploymentOrStateFullSet(dp, [
+          dp,
+          configMap,
+        ])
+          .length,
+        0,
+      );
+    },
+  );
+
+  await t.step(
+    "Check deployment with missing spec.template.spec.containers[].env[].valueFrom.configMapKeyRef",
+    () => {
+      const dp = structuredClone(deploymentWithOnlySelfRef);
+      dp.spec.template.spec.containers[0] = {
+        // @ts-ignore ts complains because it's is an untyped static object
+        env: [{
+          valueFrom: {
+            configMapKeyRef: {
+              name: "does not exist",
+              key: Object.keys(configMap.data)[0],
+            },
+          },
+        }],
+      };
+      assertEquals(
+        checkDeploymentOrStateFullSet(dp, [
+          dp,
+          configMap,
+        ])
+          .length,
+        1,
+      );
+    },
+  );
+
+  await t.step(
+    "Check deployment with missing key spec.template.spec.containers[].env[].valueFrom.configMapKeyRef",
+    () => {
+      const dp = structuredClone(deploymentWithOnlySelfRef);
+      dp.spec.template.spec.containers[0] = {
+        // @ts-ignore ts complains because it's is an untyped static object
+        env: [{
+          valueFrom: {
+            configMapKeyRef: {
+              name: configMap.metadata.name,
+              key: "keydoesnotexist",
+            },
+          },
+        }],
+      };
+      assertEquals(
+        checkDeploymentOrStateFullSet(dp, [
+          dp,
+          configMap,
+        ])
+          .length,
+        1,
+      );
+    },
+  );
+
+  await t.step(
+    "Check deployment with missing key but optional spec.template.spec.containers[].env[].valueFrom.configMapKeyRef",
+    () => {
+      const dp = structuredClone(deploymentWithOnlySelfRef);
+      dp.spec.template.spec.containers[0] = {
+        // @ts-ignore ts complains because it's is an untyped static object
+        env: [{
+          valueFrom: {
+            configMapKeyRef: {
+              optional: true,
+              name: configMap.metadata.name,
+              key: "keydoesnotexist",
+            },
+          },
+        }],
+      };
+      assertEquals(
+        checkDeploymentOrStateFullSet(dp, [
+          dp,
+          configMap,
+        ])
+          .length,
+        0,
+      );
+    },
+  );
+
+  await t.step(
+    "Check deployment spec.template.spec.containers[].env[].valueFrom.secretKeyRef",
+    () => {
+      const dp = structuredClone(deploymentWithOnlySelfRef);
+      dp.spec.template.spec.containers[0] = {
+        // @ts-ignore ts complains because it's is an untyped static object
+        env: [{
+          valueFrom: {
+            secretKeyRef: {
+              name: secret.metadata.name,
+              key: Object.keys(secret.data)[0],
+            },
+          },
+        }],
+      };
+
+      assertEquals(
+        checkDeploymentOrStateFullSet(dp, [
+          dp,
+          secret,
+        ])
+          .length,
+        0,
+      );
+    },
+  );
+
+  await t.step(
+    "Check deployment with missing spec.template.spec.containers[].env[].valueFrom.secretKeyRef",
+    () => {
+      const dp = structuredClone(deploymentWithOnlySelfRef);
+      dp.spec.template.spec.containers[0] = {
+        // @ts-ignore ts complains because it's is an untyped static object
+        env: [{
+          valueFrom: {
+            secretKeyRef: {
+              name: "doesnotexist",
+              key: Object.keys(secret.data)[0],
+            },
+          },
+        }],
+      };
+      assertEquals(
+        checkDeploymentOrStateFullSet(dp, [
+          dp,
+          secret,
+        ])
+          .length,
+        1,
+      );
+    },
+  );
+
+  await t.step(
+    "Check deployment with missing key spec.template.spec.containers[].env[].valueFrom.secretKeyRef",
+    () => {
+      const dp = structuredClone(deploymentWithOnlySelfRef);
+      dp.spec.template.spec.containers[0] = {
+        // @ts-ignore ts complains because it's is an untyped static object
+        env: [{
+          valueFrom: {
+            secretKeyRef: {
+              name: secret.metadata.name,
+              key: "doesnotexist",
+            },
+          },
+        }],
+      };
+      assertEquals(
+        checkDeploymentOrStateFullSet(dp, [
+          dp,
+          secret,
+        ])
+          .length,
+        1,
+      );
+    },
+  );
+
+  await t.step(
+    "Check deployment with missing key but optional spec.template.spec.containers[].env[].valueFrom.secretKeyRef",
+    () => {
+      const dp = structuredClone(deploymentWithOnlySelfRef);
+      dp.spec.template.spec.containers[0] = {
+        // @ts-ignore ts complains because it's is an untyped static object
+        env: [{
+          valueFrom: {
+            secretKeyRef: {
+              optional: true,
+              name: secret.metadata.name,
+              key: "doesnotexist",
+            },
+          },
+        }],
+      };
+      assertEquals(
+        checkDeploymentOrStateFullSet(dp, [
+          dp,
+          secret,
+        ])
+          .length,
+        0,
+      );
+    },
+  );
+
+  await t.step(
+    "Check deployment missing spec.template.spec.containers[].env[].valueFrom but ignored",
+    async (t) => {
+      const dp = structuredClone(deploymentWithOnlySelfRef);
+      dp.spec.template.spec.containers[0] = {
+        // @ts-ignore ts complains because it's is an untyped static object
+        env: [{
+          valueFrom: {
+            secretKeyRef: {
+              name: secret.metadata.name,
+              key: "secretDoesnotexist",
+            },
+            configMapKeyRef: {
+              name: configMap.metadata.name,
+              key: "cmDoesnotexist",
+            },
+          },
+        }],
+      };
+
+      await t.step("Assert 2 errors without ignore", () => {
+        assertEquals(
+          checkDeploymentOrStateFullSet(dp, [
+            dp,
+            secret,
+            configMap,
+          ]).length,
+          2,
+        );
+      });
+
+      await t.step("Assert 0 errors with ignore", () => {
+        assertEquals(
+          checkDeploymentOrStateFullSet(
+            dp,
+            [
+              dp,
+              secret,
+              configMap,
+            ],
+            [configMap.metadata.name],
+            [secret.metadata.name],
+          ).length,
+          0,
+        );
+      });
     },
   );
 });
