@@ -11,6 +11,7 @@ jobs:
       - uses: denoland/setup-deno@v1
         with:
           deno-version: v1.x
+      - run: deno fmt --check
       - run: deno lint
 
   deno-test:
@@ -20,4 +21,5 @@ jobs:
       - uses: denoland/setup-deno@v1
         with:
           deno-version: v1.x
-      - run: deno test
+      - run: deno test --coverage=cov/
+      - run: deno coverage --lcov cov/ > cov.lcov
