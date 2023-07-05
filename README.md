@@ -1,7 +1,7 @@
 # kuberc
 
 ```
-deno run https://deno.land/x/kuberc@v4/main.ts --help
+deno run https://deno.land/x/kuberc@v5/main.ts --help
 ```
 
 Kuberc (kube reference checker) is a tool that will check if references to other
@@ -42,16 +42,21 @@ Current CRDS that are support are:
 
 ```yml
 on:
-  - push
+  pull_request:
+  push:
 
 jobs:
   kuberc:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
-      - uses: MarkArts/kuberc/.github/workflows/kuberc.yml@v4
+      - run: kubectl kustomize overlay/testing > .kuberc-input
+      - uses: MarkArts/kuberc/.github/actions/kuberc@v5
         with:
-          file: ./examples/working-example.yml
+          file: .kuberc-input
+          extra_flags: |
+            --skip-secrets someSecretAlreadyInTheCluster \
+            --skip-configmaps someConfigmapAlreadyInTheCluster
 ```
 
 # Setup
