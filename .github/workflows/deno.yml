@@ -5,8 +5,7 @@ on:
 
 jobs:
   deno-lint:
-    runs-on:
-      group: ubuntu-runners
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
       - uses: denoland/setup-deno@v1
@@ -16,8 +15,7 @@ jobs:
       - run: deno lint
 
   deno-test:
-    runs-on:
-      group: ubuntu-runners
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
       - uses: denoland/setup-deno@v1

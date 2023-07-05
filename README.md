@@ -46,8 +46,7 @@ on:
 
 jobs:
   deno-lint:
-    runs-on:
-      group: ubuntu-runners
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
       - uses: azure/setup-kubectl@v3
