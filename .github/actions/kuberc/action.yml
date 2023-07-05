@@ -13,15 +13,15 @@ inputs:
   extra_args:
     description: 'extra arguments to pass to kuberc'
     required: false
-  skip_deno_install:
+  deno_install:
     description: "don't install deno but assume it's already installed"
     required: false
-    default: "false"
+    default: "true"
 
 runs:
   using: composite
   steps:
-    - if: not inputs.skip_deno_install
+    - if: ${{ inputs.deno_install == 'true' }}
       name: cache deno installation and deno.land dependencies
       uses: actions/cache@v2
       with:
@@ -31,7 +31,7 @@ runs:
           /home/runner/.deno
           /home/runner/.cache/deno/deps/https/deno.land
 
-    - if: not inputs.skip_deno_install
+    - if: ${{ inputs.deno_install == 'true' }}
       uses: denoland/setup-deno@v1
       with:
         deno-version: v1.x
