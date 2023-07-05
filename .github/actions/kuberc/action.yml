@@ -6,7 +6,7 @@ inputs:
   version:
     description: 'kuberc version'
     required: false
-    default: 'v4'
+    default: 'v5'
   file:
     description: 'file containing the k8s resources to check'
     required: true
