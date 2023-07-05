@@ -268,12 +268,6 @@ Deno.test("Test deployment check", async (t) => {
       },
     ];
 
-    console.log(
-      checkDeploymentOrStateFullSet(dpWithCMVolume, [
-        dpWithCMVolume,
-        configMap,
-      ]),
-    );
     assertEquals(
       checkDeploymentOrStateFullSet(dpWithCMVolume, [dpWithCMVolume, configMap])
         .length,
@@ -324,6 +318,94 @@ Deno.test("Test deployment check", async (t) => {
       1,
     );
   });
+
+  await t.step("Check deployment envFrom configmap", () => {
+    const dpWithCMEnvFrom = structuredClone(deploymentWithOnlySelfRef);
+    dpWithCMEnvFrom.spec.template.spec.containers[0] = {
+      // @ts-ignore ts complains because it's is an untyped static object
+      envFrom: [{
+        configMapRef: {
+          name: configMap.metadata.name,
+        },
+      }],
+    };
+    assertEquals(
+      checkDeploymentOrStateFullSet(dpWithCMEnvFrom, [
+        dpWithCMEnvFrom,
+        configMap,
+      ])
+        .length,
+      0,
+    );
+  });
+
+  await t.step("Check deployment with missing envFrom configmap", () => {
+    const dpWithCMEnvFrom = structuredClone(deploymentWithOnlySelfRef);
+    dpWithCMEnvFrom.spec.template.spec.containers[0] = {
+      // @ts-ignore ts complains because it's is an untyped static object
+      envFrom: [{
+        configMapRef: {
+          name: "doesNotExist",
+        },
+      }],
+    };
+    assertEquals(
+      checkDeploymentOrStateFullSet(dpWithCMEnvFrom, [
+        dpWithCMEnvFrom,
+        configMap,
+      ])
+        .length,
+      1,
+    );
+  });
+
+  await t.step(
+    "Check deployment with missing envFrom configmap but optional",
+    () => {
+      const dpWithCMEnvFrom = structuredClone(deploymentWithOnlySelfRef);
+      dpWithCMEnvFrom.spec.template.spec.containers[0] = {
+        // @ts-ignore ts complains because it's is an untyped static object
+        envFrom: [{
+          configMapRef: {
+            optional: true,
+            name: "doesNotExist",
+          },
+        }],
+      };
+      assertEquals(
+        checkDeploymentOrStateFullSet(dpWithCMEnvFrom, [
+          dpWithCMEnvFrom,
+          configMap,
+        ])
+          .length,
+        0,
+      );
+    },
+  );
+
+  await t.step(
+    "Check deployment with a skipped missing envFrom configmap",
+    () => {
+      const dpWithCMEnvFrom = structuredClone(deploymentWithOnlySelfRef);
+      dpWithCMEnvFrom.spec.template.spec.containers[0] = {
+        // @ts-ignore ts complains because it's is an untyped static object
+        envFrom: [{
+          configMapRef: {
+            optional: true,
+            name: "doesNotExist",
+          },
+        }],
+      };
+      assertEquals(
+        checkDeploymentOrStateFullSet(dpWithCMEnvFrom, [
+          dpWithCMEnvFrom,
+          configMap,
+        ], ["doesNotExist"])
+          .length,
+        0,
+      );
+    },
+  );
 });
 
 Deno.test("Test hpa check", async (t) => {
