@@ -816,6 +816,13 @@ Deno.test("Test ingress check", async (t) => {
     assertEquals(checkIngress(ingress, [ingress]).length, 1);
   });
 
+  await t.step("Check for service not existing but ignored", () => {
+    assertEquals(
+      checkIngress(ingress, [ingress], [service.metadata.name]).length,
+      0,
+    );
+  });
+
   await t.step(
     "Check for issues when service exist but ingress references 2 ports that don't",
     () => {

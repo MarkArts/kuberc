@@ -210,7 +210,7 @@ class IngressPathDoesNotExist extends ReferenceCheckIssue {
   ) {
     super(
       resource,
-      `path ${path.path} of ingress.spec.rules[].http.paths[].backend does not reference a existing service`,
+      `path ${path.path} of ingress.spec.rules[].http.paths[].backend references service (${path.backend.service.name}) which does not exist`,
     );
 
     this.path = path;
@@ -230,11 +230,15 @@ export function checkIngress(
     };
   } & BaseK8SResource,
   resources: BaseK8SResource[],
+  skipServices: string[] = [],
 ): ReferenceCheckIssue[] {
   let issues: ReferenceCheckIssue[] = [];
   for (const rule of ingress.spec.rules) {
     for (const path of rule!.http!.paths) {
-      if (!doesIngressBackendExist(path.backend, resources)) {
+      if (
+        !skipServices.includes(path.backend.service.name) &&
+        !doesIngressBackendExist(path.backend, resources)
+      ) {
         issues = [
           ...issues,
           new IngressPathDoesNotExist(ingress, path),

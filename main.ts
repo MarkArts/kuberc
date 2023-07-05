@@ -29,6 +29,10 @@ const skipConfigmapRefs: string[] = parsedArgs["skip-configmaps"]
   ? parsedArgs["skip-configmaps"].split(",")
   : [];
 
+const skipServiceRefs: string[] = parsedArgs["skip-services"]
+  ? parsedArgs["skip-services"].split(",")
+  : [];
+
 const verbose: boolean = parsedArgs.verbose ? parsedArgs.verbose : false;
 
 const resources: any = parseAll(k8sConfig);
@@ -61,7 +65,7 @@ for (const resource of resources) {
   if (resource.kind == "Ingress") {
     issues = [
       ...issues,
-      ...checkIngress(resource, resources),
+      ...checkIngress(resource, resources, skipServiceRefs),
     ];
   }
 
