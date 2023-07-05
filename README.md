@@ -45,7 +45,7 @@ on:
   - push
 
 jobs:
-  deno-lint:
+  kuberc:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
