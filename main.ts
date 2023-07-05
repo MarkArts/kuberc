@@ -11,9 +11,27 @@ import {
 } from "./src/checks.ts";
 
 const parsedArgs = parse(Deno.args);
+
+if (parsedArgs["help"]) {
+  console.log(
+    `Validate the references in a Kubernetes YAML files
+
+Usage:
+ kuberc [flags]
+
+Flags:
+--skip-secrets    Ignore references to secrets in the given list
+--skip-configmaps Ignore references to configmaps in the given list
+--skip-services   Ignore references to services in the given list
+--verbose         Output the issues in json format instead of the readable msg
+`,
+  );
+  Deno.exit(0);
+}
+
 let k8sConfig = "";
 if (parsedArgs.file) {
-  k8sConfig = await Deno.readTextFile(parsedArgs.__file);
+  k8sConfig = await Deno.readTextFile(parsedArgs.file);
 } else {
   const decoder = new TextDecoder();
   for await (const chunk of Deno.stdin.readable) {
