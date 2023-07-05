@@ -1,7 +1,7 @@
 # kuberc
 
 ```
-deno run http://deno.land/x/kuberc@v2/main.ts --help
+deno run http://deno.land/x/kuberc@v4/main.ts --help
 ```
 
 Kuberc (kube reference checker) is a tool that will check if references to other
@@ -49,11 +49,9 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
-      - uses: azure/setup-kubectl@v3
-      - uses: denoland/setup-deno@v1
+      - uses: MarkArts/kuberc/.github/workflows/kuberc.yml@v4
         with:
-          deno-version: v1.x
-      - run: kubectl kustomize deploy/myoverlay | deno run http://deno.land/x/kuberc@v3/main.ts
+          file: ./examples/working-example.yml
 ```
 
 # Setup
