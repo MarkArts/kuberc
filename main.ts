@@ -115,7 +115,7 @@ for (const [_, resource] of Object.entries(issuesByResource)) {
     if (!verbose) {
       console.log("\t" + issue.msg);
     } else {
-      console.log(issue);
+      console.log(JSON.stringify(issue));
     }
   }
 }
