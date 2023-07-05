@@ -25,8 +25,8 @@ runs:
       name: cache deno installation and deno.land dependencies
       uses: actions/cache@v2
       with:
-        key: ${{ runner.os }}-kuberc-deno
-        restore-keys: ${{ runner.os }}-deno-
+        key: ${{ runner.os }}-kuberc-deno-${{ hashFiles('**/*') }}
+        restore-keys: ${{ runner.os }}-kuberc-deno
         path: |
           /home/runner/.deno
           /home/runner/.cache/deno/deps/https/deno.land
