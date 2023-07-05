@@ -38,6 +38,25 @@ Current CRDS that are support are:
 | --verbose         | deno run main.ts --verbose                                    | Output the issues in json format instead of the readable msg |
 | --file            | deno run main.ts --file myk8sconfig.yml                       | Read from a file instead of the STDIN                        |
 
+# Github CI/Action
+
+```yml
+on:
+  - push
+
+jobs:
+  deno-lint:
+    runs-on:
+      group: ubuntu-runners
+    steps:
+      - uses: actions/checkout@v3
+      - uses: azure/setup-kubectl@v3
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+      - run: kubectl kustomize deploy/myoverlay | deno run http://deno.land/x/kuberc@v3/main.ts
+```
+
 # Setup
 
 Use the nix shell or setup deno yourself. the nix shell will also create a
@@ -59,7 +78,7 @@ kubectl kustomize ../myapp/deploy/overlays/euc1-testing/ | deno run main.ts
 
 ```
 nix-shell
-cat broken-example.yaml | deno run main.ts
+cat examples/broken-example.yml | deno run main.ts
 ```
 
 ![image](https://github.com/MarkArts/kube-reference-checker/assets/5372451/1e9ef4df-cb5e-4579-b9f5-807f81ad4ff1)

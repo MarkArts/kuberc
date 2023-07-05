@@ -1,0 +1,13 @@
+on:
+  - push
+
+jobs:
+  deno-lint:
+    runs-on:
+      group: ubuntu-runners
+    steps:
+      - uses: actions/checkout@v3
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+      - run: cat examples/working-example.yml | deno run http://deno.land/x/kuberc@v3/main.ts
