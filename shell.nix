@@ -21,7 +21,5 @@ in
         echo "$(jq ".\"deno.lint\" |= true" .vscode/settings.json)" > .vscode/settings.json
         echo "$(jq ".\"editor.defaultFormatter\" |= \"denoland.vscode-deno\"" .vscode/settings.json)" > .vscode/settings.json
         echo "$(jq ".\"editor.formatOnSave\" |= true" .vscode/settings.json)" > .vscode/settings.json
-
-        echo "$(jq ".\"python.defaultInterpreterPath\" |= \"$(which python)\"" .vscode/settings.json)" > .vscode/settings.json
     '';
 }
