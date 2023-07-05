@@ -17,13 +17,14 @@ if (parsedArgs["help"]) {
     `Validate the references in a Kubernetes YAML files
 
 Usage:
- kuberc [flags]
+ echo "myk8sconfig" | kuberc [flags]
 
 Flags:
 --skip-secrets    Ignore references to secrets in the given list
 --skip-configmaps Ignore references to configmaps in the given list
 --skip-services   Ignore references to services in the given list
 --verbose         Output the issues in json format instead of the readable msg
+--file            Read from a file instead of the STDIN
 `,
   );
   Deno.exit(0);

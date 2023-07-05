@@ -1,5 +1,9 @@
 # kuberc
 
+```
+deno run http://deno.land/x/kuberc@v2/main.ts --help
+```
+
 Kuberc (kube reference checker) is a tool that will check if references to other
 resources exist in a list of k8s resources. The use case is that if your app
 bundles a bunch of resources you can check if you correctly spelled and setup
@@ -32,6 +36,7 @@ Current CRDS that are support are:
 | --skip-configmaps | deno run main.ts --skip-configmaps newrelic-license,s3-bucket | Ignore references to configmaps in the given list            |
 | --skip-services   | deno run main.ts --skip-services external-ingress-service     | Ignore references to services in the given list              |
 | --verbose         | deno run main.ts --verbose                                    | Output the issues in json format instead of the readable msg |
+| --file            | deno run main.ts --file myk8sconfig.yml                       | Read from a file instead of the STDIN                        |
 
 # Setup
 
