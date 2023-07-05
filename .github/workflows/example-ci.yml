@@ -6,6 +6,6 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
-      - uses: MarkArts/kuberc/.github/workflows/kuberc.yml@v3
+      - uses: MarkArts/kuberc/.github/actions/kuberc.yml@master
         with:
           file: ./examples/working-example.yml
