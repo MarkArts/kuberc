@@ -37,4 +37,4 @@ runs:
         deno-version: v1.x
 
     - shell: bash
-      run: deno run http://deno.land/x/kuberc@${{ inputs.version }}/main.ts --file ${{ inputs.file }} ${{ inputs.extra_args }}
+      run: deno run --allow-read=${{ inputs.file }} http://deno.land/x/kuberc@${{ inputs.version }}/main.ts --file ${{ inputs.file }} ${{ inputs.extra_args }}
