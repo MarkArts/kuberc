@@ -375,7 +375,11 @@ type deploymentOrStatefullSet = {
           configMap?: { name: string; items: { key: string; path: string }[] };
           persistentVolumeClaim?: { claimName: string };
         }[];
+        // To lazy to typeout the whole container definition
+        // deno-lint-ignore no-explicit-any
         containers?: any;
+        // To lazy to typeout the whole container definition
+        // deno-lint-ignore no-explicit-any
         initContainers?: any;
       };
     };
@@ -423,16 +427,16 @@ export function checkDeploymentOrStateFullSet(
               new VolumeDoesNotExist(resource, volume),
             ];
           } else {
-            for (const { key, path } of volume.configMap.items) {
+            for (const item of volume.configMap.items) {
               if (
-                !Object.keys(configMap.data).some((k) => k == key)
+                !Object.keys(configMap.data).some((k) => k == item.key)
               ) {
                 issues = [
                   ...issues,
                   new ConfigmapKeyDoesNotExist(
                     resource,
                     volume.configMap.name,
-                    key,
+                    item.key,
                     ".spec.template.spec.volumes[].configmap.items[].key",
                   ),
                 ];

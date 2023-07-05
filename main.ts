@@ -54,6 +54,8 @@ const skipServiceRefs: string[] = parsedArgs["skip-services"]
 
 const verbose: boolean = parsedArgs.verbose ? parsedArgs.verbose : false;
 
+// Don't want to type out every possible k8s resource
+// deno-lint-ignore no-explicit-any
 const resources: any = parseAll(k8sConfig);
 
 let issues: ReferenceCheckIssue[] = [];
