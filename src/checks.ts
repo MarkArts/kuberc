@@ -123,7 +123,7 @@ export function checkService(
     for (const port of service.spec.ports) {
       if (
         !resource.spec.template.spec.containers.some((c) => {
-          return c.ports.some((p) => p.name == port.name);
+          return c.ports?.some((p) => p.name == port.name);
         })
       ) {
         issues = [
@@ -183,7 +183,7 @@ export function checkPodMonitor(
     for (const podMetricsEndpoint of podMonitor.spec.podMetricsEndpoints) {
       if (
         !resource.spec.template.spec.containers.some((c) => {
-          return c.ports.some((p) => p.name == podMetricsEndpoint.port);
+          return c.ports?.some((p) => p.name == podMetricsEndpoint.port);
         })
       ) {
         issues = [

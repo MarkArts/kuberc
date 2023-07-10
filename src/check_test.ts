@@ -69,6 +69,18 @@ const deployment = {
             ],
             "image": "mher/flower:1.2",
             "name": "flower",
+          },
+          {
+            "env": [],
+            "envFrom": [
+              {
+                "configMapRef": {
+                  "name": "example-env",
+                },
+              },
+            ],
+            "image": "mher/flower:1.2",
+            "name": "flower",
             "ports": [
               {
                 "containerPort": 5555,
@@ -109,7 +121,8 @@ const service = {
   spec: {
     ports: [
       {
-        name: deployment.spec.template.spec.containers[0].ports[0].name,
+        // @ts-ignore we know it exists
+        name: deployment.spec.template.spec.containers[1].ports[0].name,
         port: 42,
       },
     ],
@@ -157,7 +170,8 @@ const podMonitor = {
     podMetricsEndpoints: [
       {
         path: "/metrics",
-        port: deployment.spec.template.spec.containers[0].ports[0].name,
+        // @ts-ignore we know it exists
+        port: deployment.spec.template.spec.containers[1].ports[0].name,
       },
     ],
     selector: {
