@@ -46,7 +46,6 @@ spec:
     component: flower
     env: testing
     provider: kustomize
-    thisotherkey: alsodoesnotexist
   type: ClusterIP
 ---
 apiVersion: v1
@@ -121,10 +120,9 @@ spec:
         - --max-memory-per-child=400000
         env:
         - name: SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              key: val
-              name: example-secret-key
+          secretKeyRef:
+            key: val
+            name: example-secret-key
         - name: API_KEY
           valueFrom:
             secretKeyRef:
@@ -135,9 +133,6 @@ spec:
             secretKeyRef:
               key: val
               name: example-merchant-keys
-        envFrom:
-        - configMapRef:
-            name: euc1-testing-example-env-2d5b8f6ggb
         image: example.image/doesntexist:version
         name: task
         resources:
@@ -281,26 +276,6 @@ spec:
         - --config=flowerconfig
         - flower
         env:
-        - name: example_RABBITMQ_HOST
-          valueFrom:
-            secretKeyRef:
-              key: host
-              name: rabbitmq-connection
-        - name: example_RABBITMQ_PORT
-          valueFrom:
-            secretKeyRef:
-              key: port
-              name: rabbitmq-connection
-        - name: example_RABBITMQ_USER
-          valueFrom:
-            secretKeyRef:
-              key: username
-              name: rabbitmq-connection
-        - name: example_RABBITMQ_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: password
-              name: rabbitmq-connection
         - name: BROKER_URL
           value: amqp://$(example_RABBITMQ_USER):$(example_RABBITMQ_PASSWORD)@$(example_RABBITMQ_HOST):$(example_RABBITMQ_PORT)/$(example_RABBITMQ_VHOST)
         envFrom:
@@ -347,30 +322,6 @@ spec:
       - name: flower-storage
         persistentVolumeClaim:
           claimName: euc1-testing-example-efs-claim
----
-apiVersion: autoscaling/v2beta2
-kind: HorizontalPodAutoscaler
-metadata:
-  labels:
-    app: example
-    env: testing
-    provider: kustomize
-  name: euc1-testing-example-celery-worker-hpa
-  namespace: default
-spec:
-  maxReplicas: 10
-  metrics:
-  - resource:
-      name: cpu
-      target:
-        averageUtilization: 80
-        type: Utilization
-    type: Resource
-  minReplicas: 2
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: doesnotexist
 ---
 apiVersion: autoscaling/v2beta2
 kind: HorizontalPodAutoscaler
@@ -430,7 +381,18 @@ spec:
   - name: example-sentry-dsn
     stringData:
       val: exampleonly
+  - name: example-merchant-keys
+    data:
+      val: exampledata
   suspend: false
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: exampleSecret
+type: Opaque
+data:
+  password: examplePassword
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
@@ -451,26 +413,6 @@ spec:
   selector:
     matchLabels:
       prometheus-example: flower-pod-monitor
----
-apiVersion: monitoring.coreos.com/v1
-kind: PodMonitor
-metadata:
-  labels:
-    app: example
-    env: testing
-    provider: kustomize
-  name: euc1-testing-example-uwsgi-pod-monitor
-  namespace: default
-spec:
-  podMetricsEndpoints:
-  - path: /_metrics
-    port: uwsgi-metrics
-  podTargetLabels:
-  - app
-  - env
-  selector:
-    matchLabels:
-      prometheus-example: thisexampledoesnotexist
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress

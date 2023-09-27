@@ -1,23 +1,25 @@
 name: deno
 
 on:
-  - pull_request
+  - push
 
 jobs:
   deno-lint:
-    runs-on: [self-hosted, ubuntu20.04-self]
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: denoland/setup-deno@v1
         with:
           deno-version: v1.x
+      - run: deno fmt --check
       - run: deno lint
 
   deno-test:
-    runs-on: [self-hosted, ubuntu20.04-self]
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: denoland/setup-deno@v1
         with:
           deno-version: v1.x
-      - run: deno test
+      - run: deno test --coverage=cov/
+      - run: deno coverage --lcov cov/ > cov.lcov

@@ -1,0 +1,11 @@
+on:
+  - push
+
+jobs:
+  kuberc:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: MarkArts/kuberc/.github/actions/kuberc@main
+        with:
+          file: ./examples/working-example.yml

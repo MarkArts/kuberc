@@ -1,0 +1,40 @@
+name: kuberc
+author: Mark Arts
+description: Validates references between resources in a file containing k8s resources
+
+inputs:
+  version:
+    description: 'kuberc version'
+    required: false
+    default: 'v5'
+  file:
+    description: 'file containing the k8s resources to check'
+    required: true
+  extra_args:
+    description: 'extra arguments to pass to kuberc'
+    required: false
+  deno_install:
+    description: "don't install deno but assume it's already installed"
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - if: ${{ inputs.deno_install == 'true' }}
+      name: cache deno installation and deno.land dependencies
+      uses: actions/cache@v2
+      with:
+        key: ${{ runner.os }}-kuberc-deno-${{ hashFiles('**/*') }}
+        restore-keys: ${{ runner.os }}-kuberc-deno
+        path: |
+          /home/runner/.deno
+          /home/runner/.cache/deno/deps/https/deno.land
+
+    - if: ${{ inputs.deno_install == 'true' }}
+      uses: denoland/setup-deno@v1
+      with:
+        deno-version: v1.x
+
+    - shell: bash
+      run: deno run -q --allow-read=${{ inputs.file }} https://deno.land/x/kuberc@${{ inputs.version }}/main.ts --file ${{ inputs.file }} ${{ inputs.extra_args }}
